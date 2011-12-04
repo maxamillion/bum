@@ -4,10 +4,10 @@ This is bum - version 0.1-alpha
 What is bum?
 ------------
 bum is a package manager front end for RPM written in bash. It is a 
-"function-alike" clone of yum (Yellow Dog Updater). This is mostly written
-for fun and educational purposes and is not meant to really be used by anyone
-as a replacement for yum as yum is currently, and likely to always be, far 
-superior in performance and feature completeness.
+"function-alike" clone of yum (YellowDog Updater Modified). This is mostly 
+written for fun and educational purposes and is not meant to really be used by 
+anyone as a replacement for yum as yum is currently, and likely to always be, 
+far superior in performance and feature completeness.
 
 Why on earth?
 -------------
