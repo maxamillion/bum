@@ -1,0 +1,15 @@
+The following is the style guide for the bash code in bum.
+
+== Rules ==
+- Tabs should be 4 spaces in length
+- Code blocks should always be tab intented
+- No line is to be longer than 80 characters in length, ever.
+- Functions will be named with a leading "fn_" for function call notation
+- If return values are needed from functions, a "special" variable will be used
+  known as __return__ and functions that will return a value should always set
+  this variable to the null string at the very start of the function.
+
+Everything else not overriden in the previous section will follow:
+http://lug.fh-swf.de/vim/vim-bash/StyleGuideShell.en.pdf
+
+The style document linked above should be available in the local git repo
