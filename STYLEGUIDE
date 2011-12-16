@@ -5,10 +5,8 @@ The following is the style guide for the bash code in bum.
 - Code blocks should always be tab intented
 - No line is to be longer than 80 characters in length, ever.
 - Functions will be named with a leading "fn_" for function call notation
-    - EXEMPTION: This is for functions that do not belong to a namespace, for 
-      functions belonging to a namespace they shall comply with the style of:
-        namespace:function_name
-      NOTE: This will primarily be used within the libraries in libbum
+- Namespaces .... we can't really have them (or I can't sort out an elegant 
+  solution to them yet, so comments for where things are from would be nice)
 - If return values are needed from functions, a "special" variable will be used
   known as __return__ and functions that will return a value should always unset
   this variable as the opening statement of the function.
