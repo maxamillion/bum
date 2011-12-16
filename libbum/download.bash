@@ -8,7 +8,6 @@
 #
 # OPTIONS: NONE - This is to be a library file
 # AUTHOR: Adam Miller - maxamillion@fedoraproject.org
-# VERSION: 1.3
 #==============================================================================
 
 #=== FUNCTION ================================================================
