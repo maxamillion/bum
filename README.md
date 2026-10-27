@@ -3,7 +3,7 @@
 ## What is bum?
 bum is a package manager front end for RPM written in [bash](https://www.gnu.org/software/bash/).
 It is a "function-alike" clone of [yum](http://yum.baseurl.org/) (YellowDog Updater Modified)
-and more or less also [dnf](https://github.com/rpm-software-management/dnf). This is mostly 
+and more or less also [dnf](https://github.com/rpm-software-management/dnf) similar to [microdnf](https://github.com/rpm-software-management/microdnf). This is mostly 
 written for fun and educational purposes and is not meant to really be used by 
 anyone as a replacement for yum as yum is currently, and likely to always be, 
 far superior in performance and feature completeness.
@@ -18,16 +18,9 @@ I'm pretty sure we're going to excercise and hopefully improve our bash-fu along
 Ironically none of that happened because life happened and we got busy, but now
 we have AI and we can do all sorts of fun nonsense side projects.
 
-What can it do?
----------------
-Nothing yet ... :X
-
-The goal is to do everything that yum can but that's a lofty goal so first run
-will attempt to implement the following:
-    - update/upgrade packages
-    - install packages with automatic dependency resolution
-    - groupinstall packages with automatic dependency resolution
-    - remove packages
+# What can it do?
+Feature parity with [microdnf](https://github.com/rpm-software-management/microdnf), you can use
+`bum` anywhere you previously used `microdnf` or quite possibly in most places you used `yum` or `dnf`.
 
 ## Requirements?
 
