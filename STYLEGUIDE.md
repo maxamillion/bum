@@ -1,6 +1,8 @@
+# bum style guide
+
 The following is the style guide for the bash code in bum.
 
-== Rules ==
+# RULES
 - Tabs should be 4 spaces in length
 - Code blocks should always be tab intented
 - No line is to be longer than 80 characters in length, ever.
@@ -14,4 +16,4 @@ The following is the style guide for the bash code in bum.
 Everything else not overriden in the previous section will follow:
 http://lug.fh-swf.de/vim/vim-bash/StyleGuideShell.en.pdf
 
-The style document linked above should be available in the local git repo
+The style document linked above should be available in the local git repo as a pdf
