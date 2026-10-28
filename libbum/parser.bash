@@ -1,59 +1,78 @@
-#==============================================================================
+#=============================================================================
 #
 # FILE: parser.bash
 #
-# USAGE: source parser.bash
+# USAGE: sourced by bum
 #
-# DESCRIPTION: Anything that needs parsing in bum, it happens here.
-#
-# OPTIONS: NONE - This is to be a library file
-# AUTHOR: Adam Miller - maxamillion@fedoraproject.org
-#==============================================================================
+# DESCRIPTION: Parse the supported subset of yum-style repository files.
+#=============================================================================
 
 #=== FUNCTION ================================================================
 # NAME: fn_parse_repofile
-# DESCRIPTION:  Parse a yum style .repo file
-# PARAMETER 1:  some_file.repo
-# RETURN VAL:   associative array -- ary[repo_name]=URL 
+# DESCRIPTION: Parse sections and key/value pairs from a .repo file.
+# PARAMETER 1: readable repository configuration path
+# RETURN VAL: __return__["section|key"] values and __return__["error"]
 #=============================================================================
 function fn_parse_repofile {
-    # handle return value
     unset __return__
-    declare -A __return__
+    declare -gA __return__=()
 
-    # Some simple checking of parameter passing
-    if [[ -z "$1" ]]; then
-        # Get path, otherwise return non-zero 
-        rf_path="$1"
-    else
-        #FIXME  should probably come up with a defined way to handle stuff 
-        #       like this ... maybe a bash RULE? ... meh, ponder ...  
-        return 1
+    local file=${1-}
+    local line section key value
+    local line_number=0
+
+    if [[ -z "$file" ]]; then
+        __return__[error]='repository file path is required'
+        return 2
+    fi
+    if [[ ! -f "$file" || ! -r "$file" ]]; then
+        __return__[error]="not a readable regular file: $file"
+        return 2
     fi
 
+    section=''
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        ((line_number += 1))
+        line=${line%$'\r'}
+        line="${line#"${line%%[!$' \t']*}"}"
+        line="${line%"${line##*[!$' \t']}"}"
 
-    ### Example repo entry (abbreviated where applicable to not linewrap):
-    # [fedora]
-    # name=Fedora $releasever - $basearch
-    # failovermethod=priority
-    # baseurl=http://download.fp.org/pub/f/l/r/$releasever/E/$basearch/os/
-    # mirrorlist=https://m.fp.org/metalink?repo=f-$releasever&arch=$basearch
-    # enabled=1
-    # metadata_expire=7d
-    # gpgcheck=1
-    # gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-fedora-$basearch
+        [[ -z "$line" || "$line" == \#* || "$line" == \;* ]] && continue
 
-    #FIXME -- gracefully handle mirrorlists???? ... yeah ... later
-
-    while read line 
-    do
-        # FIXME - better way to check for this?
-        if [[ "${line:0:1}" == "[" ]]; then
-            # This is the repositoryID ... snag it
-            __return__["repoID"]="$line"
-        else
-            __return__["${line%%=*}"]="${line##=*}"
+        if [[ "$line" == \[*\] ]]; then
+            section=${line#\[}
+            section=${section%\]}
+            if [[ -z "$section" || "$section" == *'['* || \
+                "$section" == *']'* ]]; then
+                __return__[error]="$file:$line_number: invalid section"
+                return 2
+            fi
+            __return__["$section|__section__"]="$section"
+            continue
         fi
-    done < $rf_path
 
-} # END FUNCTION: fn_parse_repofile
+        if [[ -z "$section" || "$line" != *=* ]]; then
+            __return__[error]="$file:$line_number: expected section or key=value"
+            return 2
+        fi
+
+        key=${line%%=*}
+        value=${line#*=}
+        key="${key#"${key%%[!$' \t']*}"}"
+        key="${key%"${key##*[!$' \t']}"}"
+        value="${value#"${value%%[!$' \t']*}"}"
+        value="${value%"${value##*[!$' \t']}"}"
+
+        if [[ -z "$key" || "$key" == *[$' \t']* ]]; then
+            __return__[error]="$file:$line_number: invalid key"
+            return 2
+        fi
+        __return__["$section|$key"]=$value
+    done < "$file"
+
+    if (( ${#__return__[@]} == 0 )); then
+        __return__[error]="no repository sections found: $file"
+        return 2
+    fi
+    return 0
+}

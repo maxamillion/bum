@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  container-checks:
+    name: Tests / ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Fedora 44
+            image: quay.io/fedora/fedora@sha256:de3396aa9d2452c5affd4a0b6eff9d3d0a7f3af58e243827790963c30e2d5e2c
+          - name: RHEL UBI 9
+            image: registry.access.redhat.com/ubi9/ubi@sha256:a7488b086f05bf976bf116ecbaa292d0d19a7f76f0e5185119586d5583916f1a
+          - name: CentOS Stream 9
+            image: quay.io/centos/centos@sha256:e3b31ea6407bd164d326a733044298d5d08382b6ca76348b77d41c416523cdf8
+          - name: CentOS Stream 10
+            image: quay.io/centos/centos@sha256:a081b7e1c9318acd5bf9009a259c85c073659f77e139bc798ecee6cf15bb8c53
+          - name: AlmaLinux 9
+            image: quay.io/almalinuxorg/almalinux@sha256:e22e21bc8c88079ed4f019d048040d12f0447a1eb291849152dd399b94b52593
+          - name: AlmaLinux 10
+            image: quay.io/almalinuxorg/almalinux@sha256:ef0a7395168d3c8750237f78d0029dfa4ea520f0da17ed9b51750a54139f1108
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes podman
+      - name: Run checks
+        run: ./tests/container/run.sh '${{ matrix.image }}'
+      - name: Run metadata/solver tests
+        if: matrix.name == 'AlmaLinux 9' || matrix.name == 'Fedora 44'
+        run: ./tests/container/solver.sh '${{ matrix.image }}'

@@ -1,29 +1,34 @@
-# This is bum - version 0.1-alpha
+# bum — Bash Update Madness
 
-## What is bum?
-bum is a package manager front end for RPM written in [bash](https://www.gnu.org/software/bash/).
-It is a "function-alike" clone of [yum](http://yum.baseurl.org/) (YellowDog Updater Modified)
-and more or less also [dnf](https://github.com/rpm-software-management/dnf) similar to [microdnf](https://github.com/rpm-software-management/microdnf). This is mostly 
-written for fun and educational purposes and is not meant to really be used by 
-anyone as a replacement for yum as yum is currently, and likely to always be, 
-far superior in performance and feature completeness.
+bum is an experimental, standalone RPM package manager written primarily in
+Bash. The project is at an early stage; package operations are not implemented
+yet.
 
-## Why on earth?
-It started as a joke in #rhel on irc.libre.chat (originally on irc.freenode.net)
-and then a small group of us thought it would be fun to actually implement
-because there's a lot that we could learn about RPM transactions, dependencies,
-and other good information from taking the joke just a little too far. Also,
-I'm pretty sure we're going to excercise and hopefully improve our bash-fu along the way.
+The initial target operations are `install`, `upgrade`, and `remove` on
+selected Fedora, RHEL, CentOS, and AlmaLinux releases. bum is intended to own
+repository parsing, metadata and package downloads, caching, dependency
+planning, and orchestration. RPM itself will execute system package
+transactions; bum will not reimplement RPM transaction/database behavior or
+use DNF/microdnf as its operation engine. Eventual microdnf parity is an
+aspirational goal, not a current compatibility claim.
 
-Ironically none of that happened because life happened and we got busy, but now
-we have AI and we can do all sorts of fun nonsense side projects.
+See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the staged plan,
+open decisions, support-matrix tracking, and verification status.
 
-# What can it do?
-Feature parity with [microdnf](https://github.com/rpm-software-management/microdnf), you can use
-`bum` anywhere you previously used `microdnf` or quite possibly in most places you used `yum` or `dnf`.
+## Requirements
 
-## Requirements?
+The implementation target is Bash 5.1 or newer. Additional runtime dependencies
+and supported platform releases will be documented as architecture decisions
+are made.
 
-bum requires [bash](https://www.gnu.org/software/bash/) version 5.1 at a minimum so that this code base can utilize
-advanced parameter transformation operands. Other than that, the only requirement
-is [gnu coreutils](https://www.gnu.org/software/coreutils/).
+## Development checks
+
+The local container test runner uses Podman and runs syntax and CLI/parser
+smoke tests without modifying host package state:
+
+```bash
+./tests/container/run.sh
+```
+
+An optional first argument selects a Podman image. GitHub Actions runs the
+initial container syntax matrix for pull requests and pushes to `main`/`master`.

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Main command-line entry point for bum.
+set -o nounset
+
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+
+# Load project configuration and the command-line interface.
+# shellcheck disable=SC1091
+source "$script_dir/bum.conf"
+# shellcheck source=libbum/cli.bash
+source "$script_dir/libbum/cli.bash"
+
+fn_main "$@"

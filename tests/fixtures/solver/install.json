@@ -1,0 +1,17 @@
+{
+  "protocol": 1,
+  "operation": "install",
+  "package": "demo-app",
+  "arch": "x86_64",
+  "packages": [
+    {
+      "name": "demo-app",
+      "evr": "1.0-1",
+      "requires": ["demo-lib"]
+    },
+    {
+      "name": "demo-lib",
+      "evr": "1.0-1"
+    }
+  ]
+}

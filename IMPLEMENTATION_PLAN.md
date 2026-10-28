@@ -1,23 +1,22 @@
 # bum Implementation Plan
 
-**Status:** Draft — pending project-owner review  
-**Last updated:** 2026-10-27  
+**Status:** In progress — staged delivery; not a complete package manager yet
+**Last updated:** 2026-10-28
 **Purpose:** A progress-tracking plan usable by the project owner or a delegated
 coding agent. Update status, evidence, and decisions as work proceeds.
 
 ## Project direction
 
-bum is to become a standalone RPM package manager implemented primarily in
-Bash, not a frontend that delegates package operations to DNF or microdnf.
-The initial user-facing operations are `install`, `upgrade`, and `remove`.
-Eventual microdnf parity is aspirational, not an initial-release criterion.
+bum is a standalone RPM package manager implemented primarily in Bash, not a
+frontend that delegates package operations to DNF or microdnf. The initial
+user-facing operations are `install`, `upgrade`, and `remove`. Eventual
+microdnf parity is aspirational, not an initial-release criterion.
 
 bum owns repository parsing, metadata and package downloads, cache management,
 package selection, dependency solving, and transaction planning. **RPM itself
 performs system package transactions.** bum will not reimplement the RPM
 database or transaction behavior and will not delegate package operations to
-DNF/microdnf. The architecture phase decides how bum invokes RPM and handles
-locking, errors, and recovery, not whether to reinvent RPM transactions.
+DNF/microdnf.
 
 ## How to track progress
 
@@ -30,19 +29,18 @@ Use one of these values for each phase and task:
 - `[~]` Deferred or descoped; record why
 
 A phase is complete only when its exit criteria are met and evidence is
-recorded. A code change or agent report alone is not evidence. Record commands,
-relevant results, test environment, and commit/PR where applicable. Keep scope
-changes in the decision log.
+recorded. Record commands, results, test environment, and commit/PR as
+applicable. Update the progress table and decision log when work changes scope.
 
 ### Progress summary
 
 | Phase | Status | Owner | Evidence / notes |
 |---|---|---|---|
-| 0. Requirements and support contract | [ ] | | |
-| 1. Architecture and feasibility spike | [ ] | | |
-| 2. Container test infrastructure and CI | [ ] | | |
-| 3. CLI, configuration, and test foundation | [ ] | | |
-| 4. Repository parsing and metadata/cache | [ ] | | |
+| 0. Requirements and support contract | [-] | | Proposed matrix and policy; owner approval needed |
+| 1. Architecture and feasibility spike | [-] | | librepo checksum-localization + RPM-MD/libsolv fixture plan pass Fedora 44/AlmaLinux 9; installed-state prototype remains |
+| 2. Container test infrastructure and CI | [-] | | Rootless smoke matrix plus metadata/solver probes pass locally; hosted CI not run |
+| 3. CLI, configuration, and test foundation | [-] | | CLI/parser foundation and smoke tests; incomplete |
+| 4. Repository parsing and metadata/cache | [ ] | | Basic parser only; metadata/cache not implemented |
 | 5. Package model, solver, and transaction plan | [ ] | | |
 | 6. Download and trust verification | [ ] | | |
 | 7. RPM transaction integration | [ ] | | |
@@ -53,401 +51,255 @@ changes in the decision log.
 
 ### Initial scope
 
-- Support explicitly selected releases and architectures of Fedora, RHEL,
-  CentOS, and AlmaLinux. Phase 0 will specify the matrix.
+- Validate support on selected Fedora, RHEL, CentOS, and AlmaLinux releases.
+  Phase 0 proposes exact versions; owner approval is pending.
 - Provide `install`, `upgrade`, and `remove` operations.
-- Own repository parsing, metadata acquisition, cache, downloads, verification,
-  package selection, and dependency planning.
+- Own repo parsing, metadata/cache lifecycle, downloads, package selection,
+  verification, dependency solving, and planning.
 - Use RPM itself for system package transactions through a supported interface.
 - Provide a plan-only or equivalent review mode before system mutation.
-- Run tests that inspect or mutate package state in disposable containers:
-  locally with Podman and in GitHub Actions CI. Do not mutate the developer
-  host.
+- Run system-changing tests only in disposable containers: local Podman and
+  GitHub Actions CI. Do not mutate the developer host.
 
 ### Not an initial-release promise
 
 - Full microdnf, DNF, or yum compatibility.
-- Every repository option, metadata version, compression format, architecture,
-  modularity feature, or dependency policy used by every target release.
+- Every repo option, metadata format, compression, architecture, modularity
+  feature, or dependency policy on every target release.
 - Reimplementing the RPM database or transaction engine.
-
-Record scope changes in the decision log and update the compatibility matrix
-and tests.
 
 ## Global engineering and safety requirements
 
-These apply to every implementation phase:
-
-- Run package-state and system-changing tests only in disposable containers.
-  The local supported runner is Podman; GitHub Actions provides CI coverage.
-  Never mount the host RPM database or package directories into test containers.
-- Keep local and CI verification commands aligned through a shared runner
-  where practical. Record image references/digests, commands, results, and logs.
+- Package-state/system-changing tests run only in disposable containers. Never
+  mount the host RPM database/package directories into test containers.
+- Keep local and CI commands aligned; record image digest, command, results,
+  and logs. Do not claim CI coverage before a workflow run.
 - Follow `STYLEGUIDE.md`: `fn_` function names, four-space indentation,
-  maximum 80-character lines, and the `__return__` convention. Resolve the
-  tabs-versus-spaces ambiguity and enforce one convention.
-- bum may use lower-level RPM ecosystem components, but must not hand package
-  operations to DNF/microdnf or reimplement RPM transaction behavior.
-- Do not use `eval`; quote values and pass commands through Bash arrays.
-- Validate user input and repo configuration; reject unsupported or ambiguous
-  constructs rather than silently misinterpreting them.
-- Check external command failures and preserve meaningful exit statuses.
-- Treat repository metadata and packages as untrusted. Verify integrity and
-  signatures according to an explicit policy; never silently disable checks.
-- Use safe temporary files, atomic cache publication, locks, and cleanup on
-  interruption where applicable.
+  maximum 80-character lines, and `__return__`; clarify tabs-versus-spaces.
+- No `eval`; quote inputs and use arrays for constructed commands.
+- Validate repo configuration and user input; reject unsupported syntax clearly.
+- Check subprocess statuses and preserve meaningful failure codes.
+- Treat metadata/packages as untrusted; fail closed on checksum/signature
+  errors. Use safe temporary files, atomic cache publication, locks, cleanup.
+
+## Proposed support and behavior contract (owner review pending)
+
+Working proposal: validate Fedora 44, RHEL UBI 9, CentOS Stream 9/10, and
+AlmaLinux 9/10 on x86_64. This is a test matrix proposal, not a final promise
+to support every release. Older enterprise releases and other architectures
+remain unselected until API availability and CI coverage are established.
+
+Initial repository scope should use RPM-MD `repomd.xml` and primary package
+metadata. Compression formats, signature policy, key enrollment, and whether
+additional metadata is required must be decided by Phase 0/1. bum parses repo
+sections and key/value pairs; proposed first options are `baseurl`, `enabled`,
+`gpgcheck`, and `gpgkey`. Mirrorlist/metalink and distro variable expansion are
+out of initial scope until specified. Initial solving should reject downgrades,
+select architecture-compatible packages, and report unsatisfied dependencies
+or conflicts. Root is required for mutation; plan-only mode is available and
+interactive mutations require confirmation. No setuid execution. RPM controls
+the final transaction.
+
+**Open owner decisions:** supported releases/architectures; exact metadata and
+compression formats; trust/key policy; downgrade/weak-dependency policy;
+noninteractive confirmation behavior; whether repo files support more than the
+listed keys; and helper-language/runtime packaging.
 
 ## Phases
 
 ### Phase 0 — Requirements and supported-platform contract
 
-**Status:** [ ] Not started
+**Status:** [-] In progress
 
-**Tasks**
+- [ ] Confirm or revise the proposed OS/release/architecture matrix.
+- [ ] Define lower-level components bum may use while owning package workflow.
+- [ ] Define repo syntax/options, metadata/compression formats, and expansion.
+- [ ] Set architecture, weak-dependency, obsoletes, conflict, and downgrade
+  policy.
+- [ ] Define root/privilege, confirmation, noninteractive, and exit behavior.
+- [ ] Define behavior with existing DNF-managed state and concurrent managers.
+- [ ] Agree on initial-release criteria and deferred features.
 
-- [ ] Specify supported OS releases, architectures, and RPM versions for the
-  first milestone and initial release.
-- [ ] Define which lower-level RPM libraries/tools bum may use, while retaining
-  ownership of repository parsing, metadata lifecycle, downloads, cache, and
-  package-manager behavior.
-- [ ] Define the RPM invocation interface as a research question for Phase 1;
-  RPM itself performs system transactions.
-- [ ] Define initial repository syntax and metadata/compression formats,
-  including variable expansion and unsupported options.
-- [ ] Set dependency policy: architecture selection, weak dependencies,
-  obsoletes, conflicts, and downgrade behavior.
-- [ ] Define privilege expectations, confirmation, noninteractive mode, exit
-  statuses, and behavior when another package manager is active.
-- [ ] Define compatibility expectations for systems already managed by DNF
-  and how RPM database state is treated.
-- [ ] Agree on initial release criteria and postponed features.
-
-**Exit criteria**
-
-- A reviewed support matrix and behavioral contract exist.
-- Each item is decided or explicitly deferred with rationale and an owner.
-
-**Evidence:** specification/review link and unresolved questions.
+**Exit criteria:** reviewed matrix and written contract; every item decided or
+deferred with rationale and owner.
 
 ### Phase 1 — Architecture and feasibility spike
 
-**Status:** [ ] Not started
-
-**Objective:** Prove bum can load repository metadata and produce a correct
-dependency-resolved plan using a viable architecture, without modifying the
-host.
+**Status:** [-] In progress
 
 **Tasks**
 
-- [ ] Compare lower-level RPM ecosystem options for metadata parsing, version
-  comparison, dependency solving, and RPM invocation. Assess stability,
-  bindings, availability across targets, licensing, and upgrade compatibility.
-- [ ] Research metadata formats actually emitted by selected distributions.
-- [ ] Choose Bash/helper component boundaries and interfaces. bum retains
-  repository configuration, metadata lifecycle, downloads, cache, and command
-  behavior; RPM performs system package transactions.
-- [ ] Prototype loading metadata from a representative test repository and
-  producing a deterministic plan without running a transaction.
-- [ ] Prototype version and capability matching against package fixtures.
-- [ ] Record transaction invocation, lock strategy, trust/key model, cache
-  ownership, error model, and fallback options in an Architecture Decision
-  Record (ADR).
+- [ ] Assess lower-level RPM ecosystem options and API/package availability on
+  every target. Evaluate librepo (RPM-MD/download), libsolv (solver), and RPM
+  transaction invocation as candidates.
+- [ ] Prototype metadata loading, cache/checksum validation, and deterministic
+  install/upgrade/remove plans without a system transaction.
+- [ ] Decide Bash/helper boundary, protocol, runtime dependencies, and behavior
+  where bindings are unavailable. DNF/microdnf cannot execute operations.
+- [ ] Record transaction/locking, trust/key, cache, error, and recovery design
+  in reviewed ADRs.
 
-**Exit criteria**
+**Evidence to date:** `docs/adr/0001-package-manager-architecture.md` and
+`docs/adr/0002-language-boundary.md` remain proposals. `tests/container/solver.sh`
+installs librepo/libsolv bindings in disposable containers on Fedora 44 and
+AlmaLinux 9. `tests/fixtures/rpmmd` contains a locally generated two-RPM
+RPM-MD repository. With checksum checking enabled in librepo, the helper
+localizes primary metadata; the prototype parses RPM-MD primary package records
+and libsolv plans `demo-app` with `demo-lib`. Fixture solver tests also reject
+unresolved dependencies and conflicts. This validates one fixture workflow,
+not remote metadata transfer, production-grade cache policy, signatures,
+installed-state planning, RPM transactions, or equivalence across the matrix.
+Observed versions: librepo 1.21.2 / libsolv 0.7.40 (Fedora 44), librepo 1.19.0 /
+libsolv 0.7.24 (AlmaLinux 9). Upstream:
+[librepo](https://github.com/rpm-software-management/librepo),
+[libsolv](https://github.com/openSUSE/libsolv),
+[RPM transaction API](https://rpm.org/docs/latest/api/group__rpmts.html).
 
-- An ADR is reviewed and answers the architecture questions above.
-- A repeatable prototype resolves a dependency chain and reports missing or
-  conflicting dependencies without running a transaction.
-- Dependencies and limitations are documented for each target platform.
-
-**Evidence:** prototype command, fixture/repository identity, expected/actual
-plan, and results. One repository does not establish broad compatibility.
+**Exit criteria:** ADR accepted; repeatable metadata/solver prototype passes
+fixture tests on every selected target, with exact commands and results logged.
 
 ### Phase 2 — Container test infrastructure and CI
 
-**Status:** [ ] Not started
+**Status:** [-] In progress
 
-**Objective:** Make verification reproducible and isolate all integration and
-system-changing tests from the developer host.
+- [x] Add `tests/container/run.sh` using Podman and disposable containers.
+- [x] Add GitHub Actions matrix with pinned image digests.
+- [ ] Separate fast/unit and integration suites as their scale grows.
+- [ ] Run hosted Actions and configure branch protection/required checks.
+- [ ] Add more architectures only with a viable local/CI runner strategy.
 
-**Tasks**
+The runner copies the repository to a temporary directory before SELinux
+relabeling, uses a read-only mount and disabled network, and runs syntax/unit/CLI
+checks. It does not mount host package state.
 
-- [ ] Define image requirements from the Phase 0 support matrix. Select distro,
-  release, and architecture images; pin versions/digests where feasible and
-  document the update policy.
-- [ ] Add a Podman local runner to build/pull images and run tests in disposable
-  containers. Proposed shared entry point: `tests/container/run.sh`.
-- [ ] Mount only the checkout and controlled fixtures/cache. Do not mount host
-  RPM databases, package directories, or credentials. Minimize and document
-  required privileges.
-- [ ] Separate fast checks (syntax, unit, fixture tests) from container
-  integration tests (metadata, downloads, RPM transactions).
-- [ ] Capture output and image identity, propagate exit status, and provide
-  useful failure diagnostics.
-- [ ] Add GitHub Actions workflows using the shared test interface where
-  practical, with matrix coverage for supported images/architectures available
-  on GitHub-hosted runners.
-- [ ] Configure pull-request required checks. Define coverage for matrix
-  entries unavailable on hosted runners (alternate runner or documented
-  manual/periodic test); do not mark uncovered entries as passing.
-- [ ] Document Podman prerequisites, local commands, CI behavior, and failure
-  reproduction steps.
+**Container matrix / local evidence** (Podman 5.8.9, Fedora 44 host, x86_64):
 
-**Exit criteria**
+| Target image (digest reference recorded in workflow) | Detected release | Local Podman | GitHub Actions |
+|---|---|---|---|
+| Fedora 44 | 44; RPM 6.0.2 | Syntax/unit/CLI pass | Pending |
+| RHEL UBI 9 | 9.8; RPM 4.16.1.3 | Syntax/unit/CLI pass | Pending |
+| CentOS Stream 9 | 9; RPM 4.16.1.3 | Syntax/unit/CLI pass | Pending |
+| CentOS Stream 10 | 10; RPM 4.19.1.1 | Syntax/unit/CLI pass | Pending |
+| AlmaLinux 9 | 9.8; RPM 4.16.1.3 | Syntax/unit/CLI pass | Pending |
+| AlmaLinux 10 | 10.2; RPM 4.19.1.1 | Syntax/unit/CLI pass | Pending |
 
-- The Podman runner uses disposable containers, preserves failures, and does
-  not mutate host package state.
-- GitHub Actions runs the same test commands where practical and exposes
-  actionable logs per supported CI matrix entry.
-- Unavailable entries have a defined coverage path and are not reported as
-  passing without execution.
-- Pull requests are gated by agreed required checks.
-
-**Container matrix tracking template**
-
-| Distro/release | Architecture | Image tag/digest | Podman | GitHub Actions | Suites / notes |
-|---|---|---|---|---|---|
-| TBD | TBD | TBD | Pending | Pending | From Phase 0 support matrix |
-
-**Evidence:** Podman command/output, workflow run links, image identifiers,
-matrix results, and exclusions or alternate coverage.
+Workflow: `.github/workflows/ci.yml`. Local results do not substitute for a
+GitHub Actions run. Image digests and exact references are recorded in that
+workflow and should be deliberately refreshed.
 
 ### Phase 3 — CLI, configuration, and test foundation
 
-**Status:** [ ] Not started
+**Status:** [-] In progress
 
-**Tasks**
+- [x] Add executable `bum`, help/version, basic command dispatch and status
+  conventions for unimplemented operations.
+- [ ] Define/validate configuration precedence, defaults, and error behavior.
+- [x] Add initial parser and CLI fixture/smoke tests.
+- [ ] Expand option parsing, diagnostics, and automated test harness.
+- [ ] Enforce a resolved style convention and lint policy.
 
-- [ ] Add executable `bum` and source libraries relative to its location,
-  independent of caller working directory.
-- [ ] Implement dispatch for `install`, `upgrade`, and `remove`, plus help and
-  version output. Unimplemented commands must fail clearly.
-- [ ] Define configuration precedence, validation, defaults, and errors. Keep
-  sourced libraries free of unintended execution.
-- [ ] Establish exit-status and diagnostic conventions.
-- [ ] Add test scaffolding and fixtures. Ensure tests run through the container
-  infrastructure in Phase 2 where required.
-- [ ] Enforce the chosen tabs-versus-spaces style interpretation.
-
-**Exit criteria**
-
-- Help/version and invalid command/argument behavior are tested.
-- Every Bash source passes `bash -n`.
-- Tests run without root unless a disposable container explicitly requires it;
-  no test mutates the host.
-
-**Verification (adapt as harness is implemented):**
-
-```bash
-bash -n bum libbum/*.bash
-./bum --help
-./bum --version
-```
-
-Record the final automated test command when available.
+**Evidence:** `./bum --help`, `./bum --version`; CLI/parser tests execute from
+`tests/container/run.sh`. Package operations still return not-implemented;
+configuration resolution and package execution are incomplete.
 
 ### Phase 4 — Repository parsing, metadata, and cache
 
-**Status:** [ ] Not started
+**Status:** [ ] Not started (parser prototype exists)
 
-**Tasks**
+- [ ] Specify parser handling for duplicate keys, comments, quoting, malformed
+  values, multiple repo files, and all supported fields.
+- [ ] Complete robust `.repo` parsing and fixtures from target distributions.
+- [ ] Implement selected RPM-MD retrieval/parsing, metadata validation, cache
+  expiration/refresh, locking, atomic publication, and interrupted cleanup.
+- [ ] Test invalid, stale, missing, and corrupt metadata and transfer failures.
 
-- [ ] Specify and implement `.repo` syntax: sections, comments, blank lines,
-  duplicate keys, empty values, quoting, defaults, and invalid input behavior.
-- [ ] Support multiple repositories without flattening their settings into one
-  global map.
-- [ ] Implement only the variable expansion rules specified in Phase 0.
-- [ ] Validate URLs, local paths, and supported options. Reject malformed or
-  unsupported required configuration with actionable errors.
-- [ ] Implement metadata retrieval and supported format/compression handling.
-- [ ] Implement cache layout, expiration, refresh, atomic publication, locking,
-  and cleanup of incomplete data.
-- [ ] Add fixture tests from actual repo files and metadata for supported
-  distribution/release families.
-
-**Exit criteria**
-
-- Parser tests cover sections, comments, malformed input, duplicate values,
-  spaces, empty values, and variable expansion.
-- Metadata tests cover formats, stale/missing cache, failed/interrupted
-  retrieval, and invalid content.
-- Invalid or partial metadata is never exposed as a valid cache entry.
+**Exit criteria:** parser and metadata tests pass; partial/invalid metadata is
+never exposed as valid cache state.
 
 ### Phase 5 — Package model, dependency solving, and transaction plan
 
 **Status:** [ ] Not started
 
-**Tasks**
+- [ ] Define EVR, architecture, provides/requires, conflicts/obsoletes, and
+  repository priority semantics.
+- [ ] Implement candidate selection and dependency closure with selected solver.
+- [ ] Implement install/upgrade/remove plan generation and plan-only output.
+- [ ] Test dependency chains/cycles, unavailable dependencies, constraints,
+  architecture/multilib, conflicts, obsoletes, and upgrade policy.
 
-- [ ] Define package identity, EVR/version comparison, architecture, provides,
-  requires, conflicts, obsoletes, and repository priority semantics.
-- [ ] Implement candidate selection and dependency closure using the Phase 1
-  architecture.
-- [ ] Implement `install`, `upgrade`, and `remove` plan generation.
-- [ ] Detect unsatisfied dependencies, conflicts, unsupported metadata, and
-  ambiguous candidates; report them without making changes.
-- [ ] Add plan-only output suitable for review and automated tests.
-- [ ] Test dependency chains/cycles, missing dependencies, version constraints,
-  architecture/multilib selection, conflicts, obsoletes, upgrades, and
-  downgrades according to Phase 0 policy.
-
-**Exit criteria**
-
-- Plans are deterministic for fixed inputs and identify package source and
-  selection reason.
-- Failure cases are actionable and make no system changes.
-- Tests establish expected behavior for every in-scope dependency policy.
+**Exit criteria:** deterministic plans identify selected source/reason; failure
+cases are actionable and make no system changes.
 
 ### Phase 6 — Downloads and trust verification
 
 **Status:** [ ] Not started
 
-**Tasks**
-
-- [ ] Download selected packages into bum-managed cache using safe temporary
-  files and atomic publication.
-- [ ] Verify package checksums against trusted metadata before use.
-- [ ] Implement metadata and package signature handling according to Phase 0
-  trust policy.
-- [ ] Define trusted-key enrollment, rotation, expiry/revocation, and user
-  confirmation. Never trust a key solely because downloaded metadata names it.
-- [ ] Handle retries, interruptions, cache reuse, corruption, disk-full errors,
-  and cleanup.
-- [ ] Test tampering, invalid/missing signatures, and repository unavailability.
-
-**Exit criteria**
-
-- Corrupt or unverifiable content cannot enter usable cache or transactions.
-- Tests demonstrate integrity and signature failures fail closed.
-- Trust policy and key behavior are documented.
+- [ ] Download packages to bum-managed cache using temp files and atomic rename.
+- [ ] Verify package checksums against metadata and signatures per explicit
+  repository/key trust policy.
+- [ ] Define trusted-key enrollment, rotation, expiry/revocation, confirmation.
+- [ ] Test interrupted/corrupt downloads, cache reuse, tampering, and bad/missing
+  signatures; all trust failures fail closed.
 
 ### Phase 7 — RPM transaction integration
 
 **Status:** [ ] Not started
 
-**Tasks**
+- [ ] Use RPM itself for install/upgrade/remove from solver plans and verified
+  packages; do not implement RPM database/transaction behavior.
+- [ ] Coordinate locks and concurrent managers; revalidate state before commit.
+- [ ] Preserve RPM status, diagnostics, progress, and documented recovery limits.
+- [ ] Test transactions only in disposable containers for every selected target.
 
-- [ ] Implement install, upgrade, and remove through RPM itself, using the
-  solver plan and verified cached packages. Do not reimplement RPM transaction
-  or database behavior.
-- [ ] Acquire appropriate locks and detect concurrent package-manager activity.
-- [ ] Revalidate system state as needed between planning and transaction.
-- [ ] Report transaction progress and preserve failure status/diagnostics.
-- [ ] Define interruption, recovery, and partial-transaction behavior according
-  to guarantees provided by RPM.
-- [ ] Test in disposable containers for every runnable support-matrix entry:
-  install, upgrade, remove, dependency/signature failure, interruption, and
-  lock contention. Use alternate isolated runners for entries unsupported by
-  local Podman or GitHub-hosted runners.
-
-**Exit criteria**
-
-- End-to-end operations work in the declared initial support matrix.
-- Container tests confirm bum does not delegate operations to DNF/microdnf.
-- Failures preserve system/package database consistency within documented RPM
-  guarantees.
-- Recorded container matrix results identify passed, failed, and uncovered
-  entries; no entry is counted as passing without test evidence.
+**Exit criteria:** end-to-end behavior passes the support matrix; bum does not
+hand operations to DNF/microdnf; failures respect RPM guarantees.
 
 ### Phase 8 — Initial release hardening
 
 **Status:** [ ] Not started
 
-**Tasks**
-
-- [ ] Audit privileged paths, input handling, quoting, temporary files,
-  external calls, locks, and trust decisions.
-- [ ] Add useful interactive/noninteractive diagnostics without exposing secrets.
-- [ ] Document installation, prerequisites, platforms, configuration, commands,
-  examples, cache management, trust setup, and limitations.
-- [ ] Run the full container test suite across the supported matrix. Treat
-  untested entries as explicit release gaps, not implied coverage.
-- [ ] Verify README claims and update Bash/external-tool requirements.
-- [ ] Publish a release checklist and known limitations.
-
-**Exit criteria**
-
-- Release-blocking local Podman and GitHub Actions checks pass in recorded
-  clean environments; all matrix gaps are reviewed and dispositioned.
-- Security and compatibility limitations are documented.
-- No microdnf parity claim is made without a documented compatibility suite.
+- [ ] Audit privileged paths, input handling, temporary files, locks, and trust.
+- [ ] Document supported platforms, dependencies, operations, config, trust,
+  cache, and limitations; verify README claims.
+- [ ] Run full Podman/Actions matrix, document test gaps, and publish known
+  limitations and release checklist.
 
 ### Phase 9 — Compatibility expansion toward microdnf
 
-**Status:** [ ] Not started; long-term
+**Status:** [ ] Long-term
 
-**Tasks**
+- [ ] Select named microdnf reference version and create command/behavior matrix.
+- [ ] Prioritize and implement compatibility with tests per feature/platform.
+- [ ] Track output, option, and platform differences.
 
-- [ ] Build a command/behavior matrix against a named microdnf version and
-  target distributions.
-- [ ] Prioritize features by user value and architectural dependencies.
-- [ ] Implement each feature with tests against documented behavior.
-- [ ] Track unsupported options, output differences, and platform-specific
-  behavior.
+**Exit criteria:** parity claims identify upstream version, suite, and supported
+platform matrix. Until then, compatibility remains aspirational/partial.
 
-**Exit criteria**
+## Test strategy
 
-- Parity claims name the upstream version, test suite, and supported platform
-  matrix. Until then, describe compatibility as partial/aspirational.
-
-## Initial test strategy
-
-- **Unit tests:** repository parsing, configuration, version comparison,
-  metadata interpretation, candidate selection, planning, and error formatting.
-- **Fixture tests:** sanitized repo files and metadata from supported releases;
-  no network or root required for ordinary unit runs.
-- **Download tests:** controlled local server/fixtures for success, failure,
-  corruption, interruption, and cache reuse.
-- **Container integration tests:** disposable images matching the declared
-  distro/release/architecture matrix. Run locally through Podman and in GitHub
-  Actions. Cover metadata, downloads, RPM transactions, failure modes, and
-  locks. Never mutate the developer host.
-- **Static checks:** Bash syntax and selected style/lint checks aligned with
-  `STYLEGUIDE.md`.
-- **Security tests:** invalid configuration, malicious path/URL inputs,
-  checksum/signature failures, lock contention, and interruption.
-
-The shared runner should expose separate fast and integration suites and return
-accurate status. Each test report records image identity, architecture, command,
-result, and useful logs. Add exact commands to this plan as the harness evolves.
-
-## Research references
-
-Validate these against versions selected in Phase 0; interfaces and support
-status can evolve.
-
-- [DNF5 commands](https://dnf5.readthedocs.io/en/latest/commands/index.html)
-  illustrates the breadth of the eventual command surface.
-- [DNF command reference](https://dnf.readthedocs.io/en/latest/command_ref.html)
-  is a separate compatibility reference; DNF and DNF5 must not be assumed
-  interchangeable without testing.
-- [libdnf documentation](https://libdnf.readthedocs.io/en/dnf-5-devel/index.html)
-  describes a high-level package-management library. Assess stability and
-  suitability for each target during Phase 1.
-- [libdnf project](https://github.com/rpm-software-management/libdnf)
-  provides upstream context; confirm licensing, version support, and platform
-  availability before selection.
+- Unit/fixture tests for parser, config, versioning, metadata, solver, plans.
+- Controlled local transfer tests for success, corruption, failure, interruption,
+  and cache reuse.
+- Disposable container integration tests for downloads and RPM operations.
+- Syntax/style checks and security cases for paths, URLs, trust, locks, and
+  interruption.
+- Local Podman and GitHub Actions use the same test entry point where possible.
 
 ## Decision log
 
-Add dated entries with context, options, decision, consequences, owner, and
-research/review links.
-
-| Date | Decision | Status | Reference / rationale |
+| Date | Decision | Status | Notes |
 |---|---|---|---|
-| 2026-10-27 | Standalone manager; initial install/upgrade/remove; microdnf parity aspirational. | Confirmed | Project owner |
-| 2026-10-27 | bum owns repo parsing, metadata/download/cache, and package-manager behavior. | Confirmed | Project owner |
-| 2026-10-27 | RPM itself performs system package transactions; do not reimplement RPM transaction/database behavior. | Confirmed | Project owner direction |
-| 2026-10-27 | Container-contained testing; local Podman and GitHub Actions CI. | Confirmed | Project owner direction |
-| TBD | Initial OS release/architecture matrix. | Open | Phase 0 |
-| TBD | Metadata/solver components and helper-language boundary. | Open | Phase 1 ADR |
-| TBD | RPM invocation and concurrency/locking design. | Open | Phase 1 ADR |
-| TBD | Repository, package signature, and key trust policy. | Open | Phase 0 / Phase 1 ADR |
-| TBD | Container image matrix and CI coverage for unsupported hosted targets. | Open | Phase 2 |
+| 2026-10-27 | Standalone; initial install/upgrade/remove; microdnf parity aspirational. | Confirmed | Project owner |
+| 2026-10-27 | bum owns repo parsing, metadata/download/cache, and package workflow. | Confirmed | Project owner |
+| 2026-10-27 | RPM itself performs transactions; do not reimplement RPM database/transaction behavior. | Confirmed | Project owner |
+| 2026-10-27 | Container-contained testing; local Podman and GitHub Actions. | Confirmed | Project owner |
+| 2026-10-28 | Fedora 44, UBI 9, CentOS Stream 9/10, AlmaLinux 9/10 x86_64 initial test candidates. | Proposed | Owner approval pending |
+| 2026-10-28 | Evaluate librepo/libsolv/RPM with Bash orchestration and possible Python helper. | Proposed | ADRs 0001/0002; feasibility incomplete |
+| TBD | Repo format, trust/key policy, dependency defaults, privilege and locking policy. | Open | Phase 0 |
 
 ## Change log
 
 | Date | Change |
 |---|---|
-| 2026-10-27 | Initial progress-tracking plan created from owner direction and repository review. |
-| 2026-10-27 | Clarified RPM transaction boundary; added Podman/GitHub Actions container matrix. |
+| 2026-10-27 | Initial progress-tracking plan created; RPM boundary and container matrix documented. |
+| 2026-10-28 | Began execution: architecture/language ADRs, Podman/Actions matrix, CLI and parser test foundation. |
