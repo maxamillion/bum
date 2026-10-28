@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Load checksum-verified RPM-MD and create an install plan (prototype)."""
 import argparse
+import fcntl
 import gzip
 import hashlib
 import json
@@ -210,7 +211,7 @@ def _load_repo(source, cache_dir):
         return pool, repo, package_metadata
 
 
-def _download_packages(source, cache_dir, packages):
+def _download_packages_unlocked(source, cache_dir, packages):
     source = _validate_source(source)
     cache_dir = _secure_cache_dir(cache_dir)
     is_remote = source.startswith(("http://", "https://"))
@@ -333,6 +334,27 @@ def _download_packages(source, cache_dir, packages):
                 except FileNotFoundError:
                     pass
         raise
+
+
+def _download_packages(source, cache_dir, packages):
+    """Serialize package cache downloads/publication within one cache."""
+    cache_dir = _secure_cache_dir(cache_dir)
+    lock_path = os.path.join(cache_dir, ".bum-download.lock")
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    lock_fd = os.open(lock_path, flags, 0o600)
+    try:
+        info = os.fstat(lock_fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_mode & 0o077):
+            raise ValueError("unsafe package download lock")
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        return _download_packages_unlocked(source, cache_dir, packages)
+    finally:
+        os.close(lock_fd)
 
 
 def _plan(source, package_name, cache_dir, download_dir=None):

@@ -43,7 +43,6 @@ with tempfile.TemporaryDirectory(prefix="bum-rollback-") as tmp:
         def download_package(self, _href, target_path, *_args):
             pathlib.Path(target_path).write_bytes(new_data)
 
-    original_replace = helper.os.replace
     original_handle = helper.librepo.Handle
     try:
         helper.os.replace = fail_stage_publish

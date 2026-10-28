@@ -45,6 +45,7 @@ printf 'Running metadata/solver tests in %s\n' "$image"
         fi
         python3 tests/unit/solver-plan.py
         python3 tests/unit/download-rollback.py
+        python3 tests/unit/download-lock.py
         python3 helpers/bum-solver.py < tests/fixtures/solver/install.json
         bash tests/unit/repomd.bash
         python3 tests/unit/repomd-remote.py

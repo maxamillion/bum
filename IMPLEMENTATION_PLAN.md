@@ -223,8 +223,9 @@ configuration resolution and package execution are incomplete.
 - [x] Prototype selected RPM-MD primary retrieval/parsing using librepo with
   checksum verification and reusable cache; a loopback HTTP fixture test checks
   remote retrieval and repeated use.
-- [ ] Productionize metadata cache freshness/expiration, locking, atomic
-  publication, and interrupted cleanup.
+- [-] Productionize metadata cache freshness/expiration, locking, atomic
+  publication, and interrupted cleanup. Package download/cache publication now
+  has a per-cache process lock; metadata freshness and locking remain open.
 - [ ] Test invalid, stale, missing, and corrupt metadata and transfer failures.
 
 **Exit criteria:** parser and metadata tests pass; partial/invalid metadata is
