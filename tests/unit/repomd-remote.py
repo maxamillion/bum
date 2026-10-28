@@ -48,6 +48,52 @@ try:
         for output in (first.stdout, second.stdout):
             plan = json.loads(output)["plan"]
             assert {item["name"] for item in plan} == {"demo-app", "demo-lib"}
+        downloaded = subprocess.run(
+            command + ["--download", str(pathlib.Path(cache) / "rpms")],
+            check=True, capture_output=True, text=True,
+        )
+        downloaded_plan = json.loads(downloaded.stdout)["plan"]
+        assert all(pathlib.Path(item["downloaded"]).is_file()
+                   for item in downloaded_plan)
+        for item in downloaded_plan:
+            payload = pathlib.Path(item["downloaded"]).read_bytes()
+            assert hashlib.sha256(payload).hexdigest() == item["checksum"]
+
+        tampered_repo = pathlib.Path(cache) / "tampered-repo"
+        shutil.copytree(fixture, tampered_repo)
+        package_path = tampered_repo / "demo-app-1.0-1.noarch.rpm"
+        package_path.write_bytes(package_path.read_bytes() + b"tamper")
+        tampered_server = http.server.ThreadingHTTPServer(
+            ("127.0.0.1", 0),
+            functools.partial(
+                http.server.SimpleHTTPRequestHandler,
+                directory=str(tampered_repo),
+            ),
+        )
+        tampered_thread = threading.Thread(
+            target=tampered_server.serve_forever, daemon=True
+        )
+        tampered_thread.start()
+        try:
+            tampered_cache = pathlib.Path(cache) / "tampered-downloads"
+            bad_download = subprocess.run(
+                [
+                    sys.executable,
+                    str(repo_root / "helpers" / "bum-repomd.py"),
+                    f"http://127.0.0.1:{tampered_server.server_port}/",
+                    "demo-app",
+                    "--cache-dir", str(pathlib.Path(cache) / "tampered-meta"),
+                    "--download", str(tampered_cache),
+                ],
+                capture_output=True, text=True,
+            )
+            assert bad_download.returncode == 2, bad_download.stdout
+            assert json.loads(bad_download.stderr)["protocol"] == 1
+            assert not list(tampered_cache.glob("*.rpm"))
+        finally:
+            tampered_server.shutdown()
+            tampered_server.server_close()
+            tampered_thread.join(timeout=5)
         cache_path = pathlib.Path(cache)
         assert cache_path.stat().st_mode & 0o777 == 0o700
 
@@ -159,5 +205,23 @@ with tempfile.TemporaryDirectory(prefix="bum-cli-test-") as test_root:
         )
     cli_plan = json.loads(result.stdout)["plan"]
     assert {item["name"] for item in cli_plan} == {"demo-app", "demo-lib"}
+    download_env = env.copy()
+    download_env["BUM_CACHEDIR"] = str(pathlib.Path(test_root) / "cli-cache")
+    result = subprocess.run(
+        [
+            str(repo_root / "bum"), "plan", "install", "demo-app",
+            "--repo", "fixture", "--download-dir",
+            str(pathlib.Path(test_root) / "cli-rpms"),
+        ],
+        env=download_env, check=False, capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise AssertionError(
+            f"public download CLI failed ({result.returncode}): "
+            f"stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
+    downloaded_plan = json.loads(result.stdout)["plan"]
+    assert all(pathlib.Path(item["downloaded"]).is_file()
+               for item in downloaded_plan)
 
 print("[PASS] remote RPM-MD, cache reuse, and public plan CLI")

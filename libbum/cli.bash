@@ -6,7 +6,7 @@ function fn_usage {
     printf 'Usage: %s [--help] [--version] COMMAND [ARGUMENTS...]\n' "$1"
     printf '\nCommands:\n'
     printf '  plan install PACKAGE --repo REPO_ID [--repo-dir DIR]\n'
-    printf '       [--cache-dir DIR]\n'
+    printf '       [--cache-dir DIR] [--download-dir DIR]\n'
     printf '  install PACKAGE...  Install packages (not implemented)\n'
     printf '  upgrade [PACKAGE...] Upgrade packages (not implemented)\n'
     printf '  remove PACKAGE...   Remove packages (not implemented)\n'
@@ -15,7 +15,8 @@ function fn_usage {
 function fn_plan_install {
     local program=${0##*/} package='' repo_id='' repo_dir cache_dir
     local python helper url option value
-    local have_repo_dir=0 have_cache_dir=0
+    local download_dir=''
+    local have_repo_dir=0 have_cache_dir=0 have_download_dir=0
 
     repo_dir=${BUM_REPODIR:-${glbl_yum_repo_dir:-/etc/yum.repos.d}}
     if (( $# < 1 )); then
@@ -32,7 +33,7 @@ function fn_plan_install {
     while (( $# )); do
         option=$1
         case $option in
-            --repo|--repo-dir|--cache-dir)
+            --repo|--repo-dir|--cache-dir|--download-dir)
                 if (( $# < 2 )) || [[ -z $2 || $2 == --* ]]; then
                     printf '%s: option %s requires a value\n' \
                         "$program" "$option" >&2
@@ -64,6 +65,15 @@ function fn_plan_install {
                         fi
                         cache_dir=$value
                         have_cache_dir=1
+                        ;;
+                    --download-dir)
+                        if (( have_download_dir )); then
+                            printf '%s: duplicate --download-dir\n' \
+                                "$program" >&2
+                            return 2
+                        fi
+                        download_dir=$value
+                        have_download_dir=1
                         ;;
                 esac
                 shift 2
@@ -100,6 +110,30 @@ function fn_plan_install {
     fi
     url=${__return__["$repo_id|baseurl"]}
 
+    local current_uid
+    current_uid=$(id -u)
+    if (( have_download_dir )); then
+        if [[ ! -e $download_dir && ! -L $download_dir ]]; then
+            (umask 077; mkdir -p -- "$download_dir") || {
+                printf '%s: cannot create download cache: %s\n' \
+                    "$program" "$download_dir" >&2
+                return 2
+            }
+        fi
+        local download_uid download_mode
+        download_uid=$(stat -c %u -- "$download_dir" 2>/dev/null) || \
+            download_uid=''
+        download_mode=$(stat -c %a -- "$download_dir" 2>/dev/null) || \
+            download_mode=''
+        if [[ -L $download_dir || ! -d $download_dir || \
+            ! -w $download_dir || $download_uid != "$current_uid" || \
+            -z $download_mode ]] || (( (8#$download_mode & 077) != 0 )); then
+            printf '%s: download path must be a private writable directory: %s\n' \
+                "$program" "$download_dir" >&2
+            return 2
+        fi
+    fi
+
     if [[ ! -e $cache_dir && ! -L $cache_dir ]]; then
         (umask 077; mkdir -p -- "$cache_dir") || {
             printf '%s: cannot create cache directory: %s\n' \
@@ -107,8 +141,7 @@ function fn_plan_install {
             return 2
         }
     fi
-    local cache_uid cache_mode current_uid
-    current_uid=$(id -u)
+    local cache_uid cache_mode
     cache_uid=$(stat -c %u -- "$cache_dir" 2>/dev/null) || cache_uid=''
     cache_mode=$(stat -c %a -- "$cache_dir" 2>/dev/null) || cache_mode=''
     if [[ -L $cache_dir || ! -d $cache_dir || ! -w $cache_dir ||
@@ -132,7 +165,11 @@ function fn_plan_install {
         printf '%s\n' 'Python modules librepo and solv are required' >&2
         return 2
     fi
-    "$python" "$helper" "$url" "$package" --cache-dir "$cache_dir"
+    local -a helper_args=("$helper" "$url" "$package" --cache-dir "$cache_dir")
+    if (( have_download_dir )); then
+        helper_args+=(--download "$download_dir")
+    fi
+    "$python" "${helper_args[@]}"
 }
 
 function fn_main {

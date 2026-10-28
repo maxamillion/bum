@@ -42,7 +42,7 @@ applicable. Update the progress table and decision log when work changes scope.
 | 3. CLI, configuration, and test foundation | [-] | | Basic non-mutating plan-install CLI connected to repo parser and RPM-MD/libsolv helper; config/solver policy and installed state remain incomplete |
 | 4. Repository parsing and metadata/cache | [-] | | Local repo discovery/validation; strict subset URL checks; librepo RPM-MD/cache prototype tested over loopback; freshness/locking remains |
 | 5. Package model, solver, and transaction plan | [ ] | | |
-| 6. Download and trust verification | [ ] | | |
+| 6. Download and trust verification | [-] | | Helper package-download prototype stages/verifies and caches RPMs; signature policy remains open |
 | 7. RPM transaction integration | [ ] | | |
 | 8. Initial release hardening | [ ] | | |
 | 9. Compatibility expansion toward microdnf | [ ] | | |
@@ -251,9 +251,13 @@ cases are actionable and make no system changes.
 
 ### Phase 6 — Downloads and trust verification
 
-**Status:** [ ] Not started
+**Status:** [-] In progress
 
-- [ ] Download packages to bum-managed cache using temp files and atomic rename.
+- [x] Add an explicit helper `--download DIR` prototype: package hrefs from
+  primary metadata are downloaded via librepo to staging files, size/checksum
+  verified, and published in a private cache. Loopback tests verify downloads
+  and reject payload tampering. The public plan-only CLI exposes this via
+  `--download-dir DIR`; signature verification remains absent.
 - [ ] Verify package checksums against metadata and signatures per explicit
   repository/key trust policy.
 - [ ] Define trusted-key enrollment, rotation, expiry/revocation, confirmation.

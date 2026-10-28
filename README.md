@@ -5,7 +5,7 @@
 A non-mutating metadata planning command is available for experimentation:
 
 ```bash
-./bum plan install PACKAGE --repo REPO_ID [--repo-dir DIR] [--cache-dir DIR]
+./bum plan install PACKAGE --repo REPO_ID [--repo-dir DIR] [--cache-dir DIR] [--download-dir DIR]
 ```
 
 It reads the selected repository from `.repo` files, fetches RPM-MD primary

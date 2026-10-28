@@ -24,7 +24,6 @@ expect_status 2 "$bum_cmd" plan install package --repo
 expect_status 2 "$bum_cmd" plan install '' --repo on
 expect_status 2 "$bum_cmd" plan install --bad --repo on
 expect_status 2 "$bum_cmd" plan install $'bad\tname' --repo on
-
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir "$tmp/repos"
@@ -54,6 +53,11 @@ expect_status 2 "$bum_cmd" plan install pkg --repo off
 mkdir "$tmp/unsafe-cache"
 chmod 0755 "$tmp/unsafe-cache"
 expect_status 2 env BUM_CACHEDIR="$tmp/unsafe-cache" "$bum_cmd" plan install pkg --repo on
+[[ ! -e "$tmp/marker" ]]
+mkdir "$tmp/unsafe-download"
+chmod 0755 "$tmp/unsafe-download"
+expect_status 2 env BUM_CACHEDIR="$tmp/cache" "$bum_cmd" \
+    plan install pkg --repo on --download-dir "$tmp/unsafe-download"
 [[ ! -e "$tmp/marker" ]]
 output=$("$bum_cmd" plan install pkg --repo on)
 [[ "$output" == *'"plan":[]'* ]]
