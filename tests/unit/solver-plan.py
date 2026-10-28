@@ -176,8 +176,10 @@ required_state = {
     "packages": [],
 }
 remove_result = run_request(required_state)
-if remove_result.returncode == 0:
-    actions = json.loads(remove_result.stdout)["plan"]
-    assert {item["name"] for item in actions} == {"demo-lib"}, actions
+assert remove_result.returncode == 1, remove_result.stdout
+remove_error = json.loads(remove_result.stdout)
+assert "error" in remove_error, remove_error
+assert remove_error.get("problems"), remove_error
+assert "demo-lib" in " ".join(remove_error["problems"]), remove_error
 
 print("[PASS] libsolv dependency-plan tests")

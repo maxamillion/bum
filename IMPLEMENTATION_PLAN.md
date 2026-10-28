@@ -236,8 +236,9 @@ never exposed as valid cache state.
 
 - [x] Extend the JSON/libsolv fixture adapter to model installed state and
   generate install, upgrade, and remove plans; test no-downgrade upgrade behavior
-  and removal with dependents in disposable containers. This remains a fixture
-  planner, not production RPM database integration or complete policy coverage.
+  and reject removal that would break an installed dependent. This remains a
+  fixture planner, not production RPM database integration or complete policy
+  coverage.
 
 - [ ] Define EVR, architecture, provides/requires, conflicts/obsoletes, and
   repository priority semantics.
