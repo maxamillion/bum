@@ -21,66 +21,94 @@ def _strings(value, field, package_name):
     return value
 
 
+def _package(repo, pool, definition, architecture, field):
+    if not isinstance(definition, dict):
+        raise ValueError(f"each {field} package must be a JSON object")
+    name, evr = definition.get("name"), definition.get("evr")
+    if not isinstance(name, str) or not name:
+        raise ValueError(f"{field} package name must be a non-empty string")
+    if not isinstance(evr, str) or not evr:
+        raise ValueError(f"package {name} requires a non-empty evr")
+    package_arch = definition.get("arch", architecture)
+    if not isinstance(package_arch, str) or not package_arch:
+        raise ValueError(f"package {name} has invalid architecture")
+
+    solvable = repo.add_solvable()
+    solvable.name, solvable.evr, solvable.arch = name, evr, package_arch
+    solvable.add_provides(solvable.nameid)
+    capabilities = _strings(definition.get("provides", []), "provides", name)
+    for capability in capabilities:
+        solvable.add_provides(pool.Dep(capability))
+    requirements = _strings(definition.get("requires", []), "requires", name)
+    for requirement in requirements:
+        solvable.add_requires(pool.Dep(requirement))
+    conflicts = _strings(definition.get("conflicts", []), "conflicts", name)
+    for conflict in conflicts:
+        solvable.add_conflicts(pool.Dep(conflict))
+    return solvable
+
+
 def _solve(request):
     pool = solv.Pool()
     architecture = request.get("arch", "x86_64")
     if not isinstance(architecture, str) or not architecture:
         raise ValueError("arch must be a non-empty string")
     pool.setarch(architecture)
-    repo = pool.add_repo("bum-input")
-    by_name = {}
 
     packages = request.get("packages", [])
+    installed = request.get("installed", [])
     if not isinstance(packages, list):
         raise ValueError("packages must be a JSON array")
-
-    for package in packages:
-        if not isinstance(package, dict):
-            raise ValueError("each package must be a JSON object")
-        name = package.get("name")
-        evr = package.get("evr")
-        if not isinstance(name, str) or not name:
-            raise ValueError("package name must be a non-empty string")
-        if not isinstance(evr, str) or not evr:
-            raise ValueError(f"package {name} requires a non-empty evr")
-        if name in by_name:
-            raise ValueError(f"duplicate package name in fixture: {name}")
-
-        package_arch = package.get("arch", architecture)
-        if not isinstance(package_arch, str) or not package_arch:
-            raise ValueError(f"package {name} has invalid architecture")
-
-        solvable = repo.add_solvable()
-        solvable.name = name
-        solvable.evr = evr
-        solvable.arch = package_arch
-        solvable.add_provides(solvable.nameid)
-        for capability in _strings(package.get("provides", []), "provides", name):
-            solvable.add_provides(pool.Dep(capability))
-        for requirement in _strings(package.get("requires", []), "requires", name):
-            solvable.add_requires(pool.Dep(requirement))
-        for conflict in _strings(package.get("conflicts", []), "conflicts", name):
-            solvable.add_conflicts(pool.Dep(conflict))
-        by_name[name] = solvable
-
-    repo.internalize()
+    if not isinstance(installed, list):
+        raise ValueError("installed must be a JSON array")
+    available_repo = pool.add_repo("bum-input")
+    candidates = {}
+    for definition in packages:
+        solvable = _package(
+            available_repo, pool, definition, architecture, "available"
+        )
+        candidates.setdefault(solvable.name, []).append(solvable)
+    system_repo = pool.add_repo("@System")
+    installed_by_name = {}
+    for definition in installed:
+        solvable = _package(
+            system_repo, pool, definition, architecture, "installed"
+        )
+        if solvable.name in installed_by_name:
+            raise ValueError(
+                f"duplicate installed package name: {solvable.name}"
+            )
+        installed_by_name[solvable.name] = solvable
+    pool.installed = system_repo
+    available_repo.internalize()
+    system_repo.internalize()
     pool.createwhatprovides()
 
     operation = request.get("operation", "install")
-    package_name = request.get("package")
+    name = request.get("package")
     if operation not in {"install", "upgrade", "remove"}:
         raise ValueError(f"unsupported operation: {operation}")
-    if not isinstance(package_name, str) or package_name not in by_name:
-        raise ValueError(f"unknown package: {package_name}")
-    if operation != "install":
-        raise ValueError(
-            f"{operation} planning requires installed-state support"
+    if not isinstance(name, str) or not name:
+        raise ValueError("package must be a non-empty string")
+    if operation == "install":
+        if name not in candidates:
+            raise ValueError(f"unknown package: {name}")
+        # Name-based install lets libsolv select the best candidate/version.
+        job = pool.Job(
+            solv.Job.SOLVER_INSTALL | solv.Job.SOLVER_SOLVABLE_NAME,
+            pool.str2id(name, 1),
         )
+    else:
+        if name not in installed_by_name:
+            raise ValueError(f"unknown installed package: {name}")
+        old = installed_by_name[name]
+        flag = (
+            solv.Job.SOLVER_UPDATE
+            if operation == "upgrade"
+            else solv.Job.SOLVER_ERASE
+        )
+        job = pool.Job(flag | solv.Job.SOLVER_SOLVABLE, old.id)
 
-    job = pool.Job(
-        solv.Job.SOLVER_INSTALL | solv.Job.SOLVER_SOLVABLE,
-        by_name[package_name].id,
-    )
     solver = pool.Solver()
     problems = solver.solve([job])
     if problems:
@@ -91,14 +119,33 @@ def _solve(request):
         }
 
     transaction = solver.transaction()
-    return {
-        "protocol": PROTOCOL_VERSION,
-        "operation": operation,
-        "plan": [
-            {"name": item.name, "evr": item.evr, "arch": item.arch}
-            for item in transaction.steps()
-        ],
-    }
+    plan = []
+    if operation == "upgrade" and not any(
+        item.repo == available_repo and item.name == name
+        for item in transaction.steps()
+    ):
+        return {
+            "protocol": PROTOCOL_VERSION,
+            "error": f"no upgrade candidate available for: {name}",
+        }
+    for item in transaction.steps():
+        # Installed steps are removals; available steps are additions.
+        action = "remove" if item.repo == system_repo else "install"
+        plan.append({
+            "action": action,
+            "name": item.name,
+            "evr": item.evr,
+            "arch": item.arch,
+        })
+    # Preserve libsolv's transaction order: dependency and erase ordering can
+    # be significant when this plan is eventually executed.
+    # Keep protocol-v1 install response shape independent of installed state.
+    if operation == "install":
+        plan = [
+            {key: item[key] for key in ("name", "evr", "arch")}
+            for item in plan
+        ]
+    return {"protocol": PROTOCOL_VERSION, "operation": operation, "plan": plan}
 
 
 def main():

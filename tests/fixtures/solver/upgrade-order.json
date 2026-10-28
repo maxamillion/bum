@@ -1,0 +1,11 @@
+{
+  "protocol": 1,
+  "operation": "upgrade",
+  "package": "alpha-app",
+  "arch": "x86_64",
+  "installed": [{"name": "alpha-app", "evr": "1.0-1"}],
+  "packages": [
+    {"name": "alpha-app", "evr": "2.0-1", "requires": ["zulu-lib"]},
+    {"name": "zulu-lib", "evr": "1.0-1"}
+  ]
+}
