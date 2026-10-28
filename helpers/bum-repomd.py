@@ -285,12 +285,13 @@ def _download_packages(source, cache_dir, packages):
                 checksum, size, None, False
             )
             actual_size = 0
+            actual_digest = hashlib.new(digest.name)
             with open(stage_path, "rb") as stream:
                 for block in iter(lambda: stream.read(1024 * 1024), b""):
                     actual_size += len(block)
-                    digest.update(block)
+                    actual_digest.update(block)
             if (actual_size != size
-                    or digest.hexdigest().lower() != checksum.lower()):
+                    or actual_digest.hexdigest().lower() != checksum.lower()):
                 raise ValueError(f"download checksum/size mismatch: {href}")
             staged.append((stage_path, final_path))
 
@@ -309,7 +310,6 @@ def _download_packages(source, cache_dir, packages):
                     backups.append((backup_path, final_path))
                 published.append(final_path)
                 os.replace(stage_path, final_path)
-                published.append(final_path)
         except Exception:
             for final_path in published:
                 try:
