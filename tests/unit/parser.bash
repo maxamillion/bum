@@ -35,8 +35,23 @@ cat > "$repo_file" <<'EOF'
 name=first
 name=second
 EOF
-fn_parse_repofile "$repo_file"
-test "${__return__[alpha|name]}" = second
+if fn_parse_repofile "$repo_file"; then
+    printf 'expected duplicate key to fail\n' >&2
+    exit 1
+fi
+[[ "${__return__[error]}" == *'duplicate key'* ]]
+
+cat > "$repo_file" <<'EOF'
+[alpha]
+name=first
+[alpha]
+baseurl=https://example.invalid
+EOF
+if fn_parse_repofile "$repo_file"; then
+    printf 'expected duplicate section to fail\n' >&2
+    exit 1
+fi
+[[ "${__return__[error]}" == *'duplicate section'* ]]
 
 cat > "$repo_file" <<'EOF'
 name=outside-section
@@ -87,6 +102,10 @@ cat > "$repo_dir/20-disabled.repo" <<'REPO'
 enabled = no
 baseurl = file:///unused
 REPO
+cat > "$repo_dir/25-standard-port.repo" <<'REPO'
+[standard-port]
+baseurl = https://example.invalid:443/repo
+REPO
 if ! fn_load_repositories "$repo_dir"; then
     fail "valid repo directory rejected: ${__return__[error]}"
 fi
@@ -102,4 +121,39 @@ if fn_load_repositories "$repo_dir"; then
 fi
 [[ ${__return__[error]} == *'invalid enabled value'* ]] || \
     fail 'invalid enabled diagnostic missing'
+rm -f "$repo_dir/30-invalid.repo"
+
+for bad_url in \
+    'ftp://example.invalid/repo' \
+    'https:///repo' \
+    'https://bad host/repo' \
+    'https://one.invalid/repo https://two.invalid/repo' \
+    'file://relative/path' \
+    'https://[abc]/repo' \
+    'https://[::1]:bogus/repo' \
+    'https://[::1]/repo' \
+    'https://example.invalid:abc/repo' \
+    'https://example.invalid:0/repo' \
+    'https://example.invalid:65536/repo' \
+    'https://user:pass@example.invalid/repo' \
+    'https://example.invalid:/repo' \
+    'https://example.invalid/repo#fragment'; do
+    cat > "$repo_dir/40-invalid-url.repo" <<REPO
+[bad]
+baseurl = $bad_url
+REPO
+    if fn_load_repositories "$repo_dir"; then
+        fail "invalid baseurl accepted: $bad_url"
+    fi
+    [[ ${__return__[error]} == *'baseurl'* || \
+        ${__return__[error]} == *'unsupported baseurl scheme'* ]] || \
+        fail "invalid baseurl diagnostic missing: $bad_url"
+    rm -f "$repo_dir/40-invalid-url.repo"
+done
+
+cat > "$repo_dir/50-localhost-url.repo" <<'REPO'
+[localhost]
+baseurl = file://localhost/srv/repo
+REPO
+fn_load_repositories "$repo_dir" || fail "localhost file URL rejected"
 printf '[PASS] repository directory loading tests\n'

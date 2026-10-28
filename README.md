@@ -1,5 +1,21 @@
 # bum — Bash Update Madness
 
+## Current plan-only prototype
+
+A non-mutating metadata planning command is available for experimentation:
+
+```bash
+./bum plan install PACKAGE --repo REPO_ID [--repo-dir DIR] [--cache-dir DIR]
+```
+
+It reads the selected repository from `.repo` files, fetches RPM-MD primary
+metadata through librepo, and produces an install dependency plan through
+libsolv. It writes metadata and cache files under the selected cache directory;
+it does not inspect installed RPM state, download package payloads, verify
+package signatures, or change RPM/system package state. This prototype is limited
+to x86_64 and requires compatible Python `librepo` and `solv` bindings. It is
+not yet a supported package installation workflow.
+
 bum is an experimental, standalone RPM package manager written primarily in
 Bash. The project is at an early stage; package operations are not implemented
 yet.

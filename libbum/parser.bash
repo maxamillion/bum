@@ -47,6 +47,10 @@ function fn_parse_repofile {
                 __return__[error]="$file:$line_number: invalid section"
                 return 2
             fi
+            if [[ -n ${__return__["$section|__section__"]+present} ]]; then
+                __return__[error]="$file:$line_number: duplicate section [$section]"
+                return 2
+            fi
             __return__["$section|__section__"]="$section"
             continue
         fi
@@ -65,6 +69,10 @@ function fn_parse_repofile {
 
         if [[ -z "$key" || "$key" == *[$' \t']* ]]; then
             __return__[error]="$file:$line_number: invalid key"
+            return 2
+        fi
+        if [[ -n ${__return__["$section|$key"]+present} ]]; then
+            __return__[error]="$file:$line_number: duplicate key '$key'"
             return 2
         fi
         __return__["$section|$key"]=$value
@@ -88,7 +96,7 @@ function fn_load_repositories {
     declare -gA __return__=()
 
     local directory=${1-}
-    local file repo key value parsed_key
+    local file repo key value parsed_key rest authority
     local -a files=()
     local -A parsed=() seen_repos=() repositories=() file_sections=()
     local -A settings=() results=()
@@ -149,7 +157,7 @@ function fn_load_repositories {
                     if [[ "$value" != 0 && "$value" != 1 && \
                         "$value" != true && "$value" != false && \
                         "$value" != yes && "$value" != no ]]; then
-                        __return__[error]="$file: invalid $key value in [$repo]"
+                        __return__[error]="$file: invalid $key value in repo $repo"
                         return 2
                     fi
                     case "$value" in
@@ -159,9 +167,53 @@ function fn_load_repositories {
                     ;;
                 baseurl)
                     if [[ -z "$value" ]]; then
-                        __return__[error]="$file: empty baseurl in [$repo]"
+                        __return__[error]="$file: empty baseurl in repo $repo"
                         return 2
                     fi
+                    if [[ "$value" == *[[:space:]]* ]]; then
+                        __return__[error]="$file: invalid baseurl in repo $repo; whitespace or multiple URLs"
+                        return 2
+                    fi
+                    case "$value" in
+                        http://*|https://*)
+                            rest=${value#*://}
+                            authority=${rest%%[/?#]*}
+                            # Accept DNS-style names and dotted IPv4. Labels
+                            # cannot start/end with hyphens; no IPv6/userinfo.
+                            local hostname_re='^([A-Za-z0-9]'
+                            hostname_re+='([A-Za-z0-9-]*[A-Za-z0-9])?)'
+                            hostname_re+='(\.[A-Za-z0-9]'
+                            hostname_re+='([A-Za-z0-9-]*[A-Za-z0-9])?)*'
+                            hostname_re+='(:[0-9]{1,5})?$'
+                            if [[ ! "$authority" =~ $hostname_re ]]; then
+                                __return__[error]="$file: invalid baseurl in repo $repo"
+                                return 2
+                            fi
+                            if [[ "$authority" == *:* ]]; then
+                                local port=${authority##*:}
+                                if (( 10#$port < 1 || 10#$port > 65535 )); then
+                                    __return__[error]="$file: invalid baseurl in repo $repo"
+                                    return 2
+                                fi
+                            fi
+                            [[ "$value" == *'#'* ]] && {
+                                __return__[error]="$file: invalid baseurl in repo $repo"
+                                return 2
+                            }
+                            ;;
+                        file://*)
+                            rest=${value#file://}
+                            if [[ "$rest" != /* && \
+                                "$rest" != localhost/* ]]; then
+                                __return__[error]="$file: invalid baseurl in repo $repo"
+                                return 2
+                            fi
+                            ;;
+                        *)
+                            __return__[error]="$file: unsupported baseurl scheme in repo $repo"
+                            return 2
+                            ;;
+                    esac
                     ;;
             esac
             settings["$repo|$key"]=$value

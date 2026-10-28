@@ -39,8 +39,8 @@ applicable. Update the progress table and decision log when work changes scope.
 | 0. Requirements and support contract | [-] | | Proposed matrix and policy; owner approval needed |
 | 1. Architecture and feasibility spike | [-] | | librepo checksum-localization + RPM-MD/libsolv fixture plan pass Fedora 44/AlmaLinux 9; installed-state prototype remains |
 | 2. Container test infrastructure and CI | [-] | | Rootless smoke matrix plus metadata/solver probes pass locally; hosted CI not run |
-| 3. CLI, configuration, and test foundation | [-] | | CLI/parser foundation and smoke tests; repository config loader now validates supported subset; CLI not integrated |
-| 4. Repository parsing and metadata/cache | [-] | | Local repo discovery/validation plus librepo remote RPM-MD primary fetch with checksum verification and reusable cache tested over loopback; robust freshness/locking remains |
+| 3. CLI, configuration, and test foundation | [-] | | Basic non-mutating plan-install CLI connected to repo parser and RPM-MD/libsolv helper; config/solver policy and installed state remain incomplete |
+| 4. Repository parsing and metadata/cache | [-] | | Local repo discovery/validation; strict subset URL checks; librepo RPM-MD/cache prototype tested over loopback; freshness/locking remains |
 | 5. Package model, solver, and transaction plan | [ ] | | |
 | 6. Download and trust verification | [ ] | | |
 | 7. RPM transaction integration | [ ] | | |
@@ -190,6 +190,14 @@ workflow and should be deliberately refreshed.
 ### Phase 3 — CLI, configuration, and test foundation
 
 **Status:** [-] In progress
+
+- [x] Add a non-mutating `plan install PACKAGE --repo REPO_ID` CLI path that
+  validates repository selection and invokes the RPM-MD planner. This is a
+  prototype vertical slice; it does not read installed RPM state or mutate the
+  RPM database/package state.
+- [x] Reject duplicate repository keys/sections, unsupported URL schemes,
+  malformed supported URL authorities, and unsafe cache directory ownership or
+  permissions before planning.
 
 - [x] Add executable `bum`, help/version, basic command dispatch and status
   conventions for unimplemented operations.
