@@ -253,6 +253,8 @@ cases are actionable and make no system changes.
 
 **Status:** [-] In progress
 
+- [x] Roll back failed RPM cache publication and test restoration of a prior
+  cache entry with injected failure; confirm temporary files are cleaned.
 - [x] Add an explicit helper `--download DIR` prototype: package hrefs from
   primary metadata are downloaded via librepo to staging files, size/checksum
   verified, and published in a private cache. Loopback tests verify downloads

@@ -307,6 +307,7 @@ def _download_packages(source, cache_dir, packages):
                     os.close(backup_fd)
                     os.replace(final_path, backup_path)
                     backups.append((backup_path, final_path))
+                published.append(final_path)
                 os.replace(stage_path, final_path)
                 published.append(final_path)
         except Exception:
