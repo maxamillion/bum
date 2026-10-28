@@ -69,3 +69,37 @@ fi
 test "${__return__[error]}" = 'repository file path is required'
 
 printf '[PASS] repository parser tests\n'
+
+# Repository directory loader applies defaults and validates required fields.
+repo_dir=$(mktemp -d)
+trap 'rm -rf -- "$tmp_dir" "$repo_dir"' EXIT
+fail() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+cat > "$repo_dir/10-enabled.repo" <<'REPO'
+[enabled]
+name = Enabled repository
+baseurl = https://example.invalid/repo?arch=x86_64
+REPO
+cat > "$repo_dir/20-disabled.repo" <<'REPO'
+[disabled]
+enabled = no
+baseurl = file:///unused
+REPO
+if ! fn_load_repositories "$repo_dir"; then
+    fail "valid repo directory rejected: ${__return__[error]}"
+fi
+[[ ${__return__[enabled|enabled]} == 1 && \
+    ${__return__[enabled|gpgcheck]} == 1 && \
+    ${__return__[disabled|enabled]} == 0 ]] || fail 'repo defaults incorrect'
+cat > "$repo_dir/30-invalid.repo" <<'REPO'
+[invalid]
+enabled = perhaps
+REPO
+if fn_load_repositories "$repo_dir"; then
+    fail 'invalid enabled value accepted'
+fi
+[[ ${__return__[error]} == *'invalid enabled value'* ]] || \
+    fail 'invalid enabled diagnostic missing'
+printf '[PASS] repository directory loading tests\n'

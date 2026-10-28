@@ -39,8 +39,8 @@ applicable. Update the progress table and decision log when work changes scope.
 | 0. Requirements and support contract | [-] | | Proposed matrix and policy; owner approval needed |
 | 1. Architecture and feasibility spike | [-] | | librepo checksum-localization + RPM-MD/libsolv fixture plan pass Fedora 44/AlmaLinux 9; installed-state prototype remains |
 | 2. Container test infrastructure and CI | [-] | | Rootless smoke matrix plus metadata/solver probes pass locally; hosted CI not run |
-| 3. CLI, configuration, and test foundation | [-] | | CLI/parser foundation and smoke tests; incomplete |
-| 4. Repository parsing and metadata/cache | [ ] | | Basic parser only; metadata/cache not implemented |
+| 3. CLI, configuration, and test foundation | [-] | | CLI/parser foundation and smoke tests; repository config loader now validates supported subset; CLI not integrated |
+| 4. Repository parsing and metadata/cache | [-] | | Local *.repo discovery and validation implemented; remote metadata/cache not implemented |
 | 5. Package model, solver, and transaction plan | [ ] | | |
 | 6. Download and trust verification | [ ] | | |
 | 7. RPM transaction integration | [ ] | | |
@@ -204,8 +204,11 @@ configuration resolution and package execution are incomplete.
 
 ### Phase 4 — Repository parsing, metadata, and cache
 
-**Status:** [ ] Not started (parser prototype exists)
+**Status:** [-] In progress
 
+- [x] Implement deterministic local `*.repo` discovery and validate the first
+  supported options (`name`, `baseurl`, `enabled`, `gpgcheck`, `gpgkey`), with
+  boolean defaults and rejection of unknown options.
 - [ ] Specify parser handling for duplicate keys, comments, quoting, malformed
   values, multiple repo files, and all supported fields.
 - [ ] Complete robust `.repo` parsing and fixtures from target distributions.
