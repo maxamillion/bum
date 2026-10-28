@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Load RPM-MD with librepo and build a fixture plan with libsolv."""
+"""Load checksum-verified RPM-MD and create an install plan (prototype)."""
 import argparse
 import gzip
 import json
+import os
 import sys
+import tempfile
 import xml.etree.ElementTree as ElementTree
 
 import librepo
@@ -71,32 +73,40 @@ def _parse_primary(pool, repo, primary_path):
                     method(dependency)
 
 
-def _load_repo(source):
-    handle = librepo.Handle()
-    result = librepo.Result()
-    handle.setopt(librepo.LRO_REPOTYPE, librepo.LR_YUMREPO)
-    handle.setopt(librepo.LRO_URLS, [source])
-    handle.setopt(librepo.LRO_LOCAL, True)
-    handle.setopt(librepo.LRO_CHECKSUM, True)
-    handle.setopt(librepo.LRO_IGNOREMISSING, True)
-    handle.perform(result)
+def _load_repo(source, cache_dir):
+    os.makedirs(cache_dir, mode=0o755, exist_ok=True)
+    cache_dir = os.path.realpath(cache_dir)
+    source = os.path.realpath(source) if os.path.isdir(source) else source
+    with tempfile.TemporaryDirectory(prefix="bum-repomd-") as work_dir:
+        handle = librepo.Handle()
+        result = librepo.Result()
+        handle.setopt(librepo.LRO_REPOTYPE, librepo.LR_YUMREPO)
+        handle.setopt(librepo.LRO_URLS, [source])
+        handle.setopt(librepo.LRO_LOCAL, not source.startswith(("http://", "https://")))
+        handle.setopt(librepo.LRO_CACHEDIR, cache_dir)
+        handle.setopt(librepo.LRO_DESTDIR, work_dir)
+        handle.setopt(librepo.LRO_CHECKSUM, True)
+        handle.setopt(librepo.LRO_IGNOREMISSING, True)
+        handle.setopt(librepo.LRO_RPMMDDLIST, ["primary"])
+        handle.setopt(librepo.LRO_YUMDLIST, ["primary"])
+        handle.perform(result)
 
-    paths = result.getinfo(librepo.LRR_YUM_REPO)
-    primary_path = paths.get("primary")
-    if not primary_path:
-        raise ValueError("RPM-MD repository has no primary metadata")
+        paths = result.getinfo(librepo.LRR_YUM_REPO)
+        primary_path = paths.get("primary")
+        if not primary_path:
+            raise ValueError("RPM-MD repository has no primary metadata")
 
-    pool = solv.Pool()
-    pool.setarch("x86_64")
-    repo = pool.add_repo("bum-repomd")
-    _parse_primary(pool, repo, primary_path)
-    repo.internalize()
-    pool.createwhatprovides()
-    return pool, repo
+        pool = solv.Pool()
+        pool.setarch("x86_64")
+        repo = pool.add_repo("bum-repomd")
+        _parse_primary(pool, repo, primary_path)
+        repo.internalize()
+        pool.createwhatprovides()
+        return pool, repo
 
 
-def _plan(source, package_name):
-    pool, repo = _load_repo(source)
+def _plan(source, package_name, cache_dir):
+    pool, repo = _load_repo(source, cache_dir)
     matches = [item for item in repo.solvables_iter() if item.name == package_name]
     if not matches:
         raise ValueError(f"package not found: {package_name}")
@@ -123,11 +133,16 @@ def _plan(source, package_name):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("repo")
+    parser.add_argument("repo", help="local RPM-MD repository directory or URL")
     parser.add_argument("package")
+    parser.add_argument(
+        "--cache-dir",
+        default=os.path.join(tempfile.gettempdir(), "bum-cache"),
+        help="directory for librepo's metadata cache",
+    )
     args = parser.parse_args()
     try:
-        result = _plan(args.repo, args.package)
+        result = _plan(args.repo, args.package, args.cache_dir)
         print(json.dumps(result, sort_keys=True))
         return 0 if "error" not in result else 1
     except (librepo.LibrepoException, OSError, ValueError) as exc:

@@ -40,7 +40,7 @@ applicable. Update the progress table and decision log when work changes scope.
 | 1. Architecture and feasibility spike | [-] | | librepo checksum-localization + RPM-MD/libsolv fixture plan pass Fedora 44/AlmaLinux 9; installed-state prototype remains |
 | 2. Container test infrastructure and CI | [-] | | Rootless smoke matrix plus metadata/solver probes pass locally; hosted CI not run |
 | 3. CLI, configuration, and test foundation | [-] | | CLI/parser foundation and smoke tests; repository config loader now validates supported subset; CLI not integrated |
-| 4. Repository parsing and metadata/cache | [-] | | Local *.repo discovery and validation implemented; remote metadata/cache not implemented |
+| 4. Repository parsing and metadata/cache | [-] | | Local repo discovery/validation plus librepo remote RPM-MD primary fetch with checksum verification and reusable cache tested over loopback; robust freshness/locking remains |
 | 5. Package model, solver, and transaction plan | [ ] | | |
 | 6. Download and trust verification | [ ] | | |
 | 7. RPM transaction integration | [ ] | | |
@@ -212,8 +212,11 @@ configuration resolution and package execution are incomplete.
 - [ ] Specify parser handling for duplicate keys, comments, quoting, malformed
   values, multiple repo files, and all supported fields.
 - [ ] Complete robust `.repo` parsing and fixtures from target distributions.
-- [ ] Implement selected RPM-MD retrieval/parsing, metadata validation, cache
-  expiration/refresh, locking, atomic publication, and interrupted cleanup.
+- [x] Prototype selected RPM-MD primary retrieval/parsing using librepo with
+  checksum verification and reusable cache; a loopback HTTP fixture test checks
+  remote retrieval and repeated use.
+- [ ] Productionize metadata cache freshness/expiration, locking, atomic
+  publication, and interrupted cleanup.
 - [ ] Test invalid, stale, missing, and corrupt metadata and transfer failures.
 
 **Exit criteria:** parser and metadata tests pass; partial/invalid metadata is
