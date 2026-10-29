@@ -1,20 +1,28 @@
 # bum — Bash Update Madness
 
-## Current plan-only prototype
+## Current plan-only prototypes
 
-A non-mutating metadata planning command is available for experimentation:
+Experimental, non-mutating install and remove planning commands are available:
 
 ```bash
 ./bum plan install PACKAGE --repo REPO_ID [--repo-dir DIR] [--cache-dir DIR] [--download-dir DIR]
+./bum plan remove PACKAGE [--arch ARCH]
 ```
 
-It reads the selected repository from `.repo` files, fetches RPM-MD primary
-metadata through librepo, and produces an install dependency plan through
-libsolv. It writes metadata and cache files under the selected cache directory;
-it does not inspect installed RPM state, download package payloads, verify
-package signatures, or change RPM/system package state. This prototype is limited
-to x86_64 and requires compatible Python `librepo` and `solv` bindings. It is
-not yet a supported package installation workflow.
+`plan install` reads the selected repository from `.repo` files, fetches
+RPM-MD primary metadata through librepo, and produces an install dependency
+plan through libsolv. It writes metadata/cache files under the selected cache
+directory; its planning path does not use installed RPM state. The optional
+`--download-dir` exercises the package payload download/cache prototype.
+
+`plan remove` queries installed package inventory with `rpm -qa` and asks
+libsolv to plan removal for the requested package and architecture. It does not
+load repository candidates or propose replacements. Both commands are planning
+only: neither invokes an RPM transaction nor changes installed package state.
+Package signature verification and trusted-key policy are not implemented.
+The install prototype is limited to x86_64; the planning helpers require
+compatible Python `libsolv` bindings, and install planning also requires
+`librepo`. These are not supported package mutation workflows.
 
 bum is an experimental, standalone RPM package manager written primarily in
 Bash. The project is at an early stage; package operations are not implemented
