@@ -240,6 +240,9 @@ never exposed as valid cache state.
   and reject removal that would break an installed dependent. This remains a
   fixture planner, not production RPM database integration or complete policy
   coverage.
+- [x] Add a read-only RPM CLI inventory adapter with normalized epoch-version-
+  release/architecture records, deterministic ordering, and malformed/duplicate/
+  RPM-query failure tests. Production inventory-to-solver wiring remains open.
 
 - [ ] Define EVR, architecture, provides/requires, conflicts/obsoletes, and
   repository priority semantics.
