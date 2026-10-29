@@ -26,8 +26,6 @@ def inventory(rpm="rpm"):
         if len(fields) != 5 or any(not field for field in fields):
             raise ValueError(f"malformed rpm query record at line {line_number}")
         name, epoch, version, release, arch = fields
-        if any("\n" in item or "\r" in item for item in fields):
-            raise ValueError(f"invalid rpm query record at line {line_number}")
         identity = (name, arch)
         if identity in seen:
             raise ValueError(

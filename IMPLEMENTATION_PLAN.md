@@ -242,7 +242,11 @@ never exposed as valid cache state.
   coverage.
 - [x] Add a read-only RPM CLI inventory adapter with normalized epoch-version-
   release/architecture records, deterministic ordering, and malformed/duplicate/
-  RPM-query failure tests. Production inventory-to-solver wiring remains open.
+  RPM-query failure tests.
+- [-] Add `plan remove PACKAGE [--arch ARCH]`: connect read-only RPM inventory
+  to libsolv, select multilib identity explicitly, and reject removal that breaks
+  installed dependents. This remains plan-only; install/upgrade planning and
+  production solver policy are not complete.
 
 - [ ] Define EVR, architecture, provides/requires, conflicts/obsoletes, and
   repository priority semantics.

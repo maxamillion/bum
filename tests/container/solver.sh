@@ -43,7 +43,12 @@ printf 'Running metadata/solver tests in %s\n' "$image"
             printf "No package installer for RPM-MD test dependencies\\n" >&2
             exit 77
         fi
+        rpm_inventory_before=$(rpm -qa | sort)
         python3 tests/unit/solver-plan.py
+        python3 tests/unit/plan-remove.py
+        python3 tests/unit/plan-remove.py
+        rpm_inventory_after=$(rpm -qa | sort)
+        test "$rpm_inventory_before" = "$rpm_inventory_after"
         python3 tests/unit/rpm-inventory.py
         python3 tests/unit/download-rollback.py
         python3 tests/unit/download-lock.py

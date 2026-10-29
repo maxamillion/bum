@@ -24,6 +24,9 @@ expect_status 2 "$bum_cmd" plan install package --repo
 expect_status 2 "$bum_cmd" plan install '' --repo on
 expect_status 2 "$bum_cmd" plan install --bad --repo on
 expect_status 2 "$bum_cmd" plan install $'bad\tname' --repo on
+expect_status 2 "$bum_cmd" plan remove
+expect_status 2 "$bum_cmd" plan remove --bad
+
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir "$tmp/repos"
@@ -37,22 +40,30 @@ EOF
 cat > "$tmp/python" <<'EOF'
 #!/usr/bin/env bash
 if [[ $1 == -c ]]; then exit 0; fi
+case $* in
+    *bum-plan-remove.py*)
+        printf '%s\n' '{"protocol":1,"error":"rpm inventory failed"}'
+        exit 2
+        ;;
+esac
 printf called > "$BUM_MARKER"
 printf '{"protocol":1,"plan":[]}\n'
 EOF
 chmod +x "$tmp/python"
 export BUM_REPODIR="$tmp/repos" BUM_CACHEDIR="$tmp/cache"
 export BUM_PYTHON="$tmp/python" BUM_MARKER="$tmp/marker"
+export BUM_INVENTORY_HELPER="$tmp/inventory"
+export BUM_SOLVER_HELPER="$tmp/solver"
 expect_status 2 "$bum_cmd" plan install pkg --repo missing
 [[ ! -e "$tmp/cache" ]]
 [[ ! -e "$tmp/marker" ]]
 expect_status 2 "$bum_cmd" plan install pkg --repo off
 [[ ! -e "$tmp/cache" ]]
 [[ ! -e "$tmp/marker" ]]
-# Existing cache directories must be private and owned by the caller.
 mkdir "$tmp/unsafe-cache"
 chmod 0755 "$tmp/unsafe-cache"
-expect_status 2 env BUM_CACHEDIR="$tmp/unsafe-cache" "$bum_cmd" plan install pkg --repo on
+expect_status 2 env BUM_CACHEDIR="$tmp/unsafe-cache" "$bum_cmd" \
+    plan install pkg --repo on
 [[ ! -e "$tmp/marker" ]]
 mkdir "$tmp/unsafe-download"
 chmod 0755 "$tmp/unsafe-download"
@@ -62,4 +73,5 @@ expect_status 2 env BUM_CACHEDIR="$tmp/cache" "$bum_cmd" \
 output=$("$bum_cmd" plan install pkg --repo on)
 [[ "$output" == *'"plan":[]'* ]]
 [[ -e "$tmp/marker" ]]
+expect_status 2 "$bum_cmd" plan remove demo
 printf '[PASS] CLI tests\n'

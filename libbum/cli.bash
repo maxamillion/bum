@@ -7,6 +7,7 @@ function fn_usage {
     printf '\nCommands:\n'
     printf '  plan install PACKAGE --repo REPO_ID [--repo-dir DIR]\n'
     printf '       [--cache-dir DIR] [--download-dir DIR]\n'
+    printf '  plan remove PACKAGE [--arch ARCH]\n'
     printf '  install PACKAGE...  Install packages (not implemented)\n'
     printf '  upgrade [PACKAGE...] Upgrade packages (not implemented)\n'
     printf '  remove PACKAGE...   Remove packages (not implemented)\n'
@@ -172,6 +173,43 @@ function fn_plan_install {
     "$python" "${helper_args[@]}"
 }
 
+function fn_plan_remove {
+    local program=${0##*/} package=${1-} arch=${BUM_ARCH:-x86_64}
+    local python helper inventory_helper solver_helper
+    if [[ -z $package || $package == -* || $package =~ [^a-zA-Z0-9._+:-] ||
+          -z $arch || $arch =~ [^a-zA-Z0-9_+-] ]]; then
+        printf '%s: plan remove requires a valid package name\n' \
+            "$program" >&2
+        return 2
+    fi
+    shift
+    if (( $# )); then
+        if (( $# != 2 )) || [[ $1 != --arch || -z $2 || $2 == -* ]]; then
+            printf '%s: expected optional --arch ARCH\n' "$program" >&2
+            return 2
+        fi
+        arch=$2
+    fi
+    python=${BUM_PYTHON:-python3}
+    if ! command -v "$python" >/dev/null 2>&1; then
+        printf '%s: Python interpreter not found: %s\n' "$program" "$python" >&2
+        return 2
+    fi
+    if ! "$python" -c 'import solv' >/dev/null 2>&1; then
+        printf '%s: planning dependency missing: Python module solv\n' \
+            "$program" >&2
+        return 2
+    fi
+    helper_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+    inventory_helper=${BUM_INVENTORY_HELPER:-$helper_root/helpers/bum-rpm-inventory.py}
+    solver_helper=${BUM_SOLVER_HELPER:-$helper_root/helpers/bum-solver.py}
+    helper=${BUM_PLAN_REMOVE_HELPER:-$helper_root/helpers/bum-plan-remove.py}
+    printf '{"protocol":1,"package":"%s","arch":"%s"}' \
+        "$package" "$arch" |
+        "$python" "$helper" --inventory "$inventory_helper" \
+            --solver "$solver_helper"
+}
+
 function fn_main {
     local program=${0##*/} command
 
@@ -201,13 +239,26 @@ function fn_main {
     shift
     case $command in
         plan)
-            if (( $# == 0 )) || [[ $1 != install ]]; then
-                printf '%s: supported plan command is: plan install\n' \
+            if (( $# == 0 )); then
+                printf '%s: plan requires install or remove\n' \
                     "$program" >&2
                 return 2
             fi
-            shift
-            fn_plan_install "$@"
+            case $1 in
+                install)
+                    shift
+                    fn_plan_install "$@"
+                    ;;
+                remove)
+                    shift
+                    fn_plan_remove "$@"
+                    ;;
+                *)
+                    printf '%s: supported plans are: install, remove\n' \
+                        "$program" >&2
+                    return 2
+                    ;;
+            esac
             ;;
         install|upgrade|remove)
             if [[ $command != upgrade && $# -eq 0 ]]; then

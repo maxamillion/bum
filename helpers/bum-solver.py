@@ -74,11 +74,13 @@ def _solve(request):
         solvable = _package(
             system_repo, pool, definition, architecture, "installed"
         )
-        if solvable.name in installed_by_name:
+        identity = (solvable.name, solvable.arch)
+        if identity in installed_by_name:
             raise ValueError(
-                f"duplicate installed package name: {solvable.name}"
+                f"duplicate installed package identity: "
+                f"{solvable.name}.{solvable.arch}"
             )
-        installed_by_name[solvable.name] = solvable
+        installed_by_name[identity] = solvable
     pool.installed = system_repo
     available_repo.internalize()
     system_repo.internalize()
@@ -86,6 +88,9 @@ def _solve(request):
 
     operation = request.get("operation", "install")
     name = request.get("package")
+    requested_arch = request.get("arch", architecture)
+    if not isinstance(requested_arch, str) or not requested_arch:
+        raise ValueError("arch must be a non-empty string")
     if operation not in {"install", "upgrade", "remove"}:
         raise ValueError(f"unsupported operation: {operation}")
     if not isinstance(name, str) or not name:
@@ -99,9 +104,20 @@ def _solve(request):
             pool.str2id(name, 1),
         )
     else:
-        if name not in installed_by_name:
-            raise ValueError(f"unknown installed package: {name}")
-        old = installed_by_name[name]
+        installed_matches = [
+            solvable for (installed_name, installed_arch), solvable
+            in installed_by_name.items()
+            if installed_name == name and installed_arch == requested_arch
+        ]
+        if not installed_matches:
+            raise ValueError(
+                f"unknown installed package: {name}.{requested_arch}"
+            )
+        if len(installed_matches) > 1:
+            raise ValueError(
+                f"ambiguous installed package: {name}.{requested_arch}"
+            )
+        old = installed_matches[0]
         flag = (
             solv.Job.SOLVER_UPDATE
             if operation == "upgrade"

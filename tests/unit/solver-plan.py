@@ -151,6 +151,20 @@ removal = json.loads(result.stdout)
 assert removal["plan"] == [{"action": "remove", "name": "demo",
                            "evr": "1.0-1", "arch": "x86_64"}], removal
 
+multilib = {
+    "operation": "remove", "package": "demo", "arch": "i686",
+    "packages": [],
+    "installed": [
+        {"name": "demo", "evr": "1.0-1", "arch": "x86_64"},
+        {"name": "demo", "evr": "1.0-1", "arch": "i686"},
+    ],
+}
+multilib_result = run_request(multilib)
+assert multilib_result.returncode == 0, multilib_result.stdout
+multilib_plan = json.loads(multilib_result.stdout)["plan"]
+assert multilib_plan == [{"action": "remove", "name": "demo",
+                          "evr": "1.0-1", "arch": "i686"}], multilib_plan
+
 # An upgrade with no newer candidate must not report a misleading no-op.
 old_only = {
     "operation": "upgrade",
