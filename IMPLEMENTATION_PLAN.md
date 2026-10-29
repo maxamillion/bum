@@ -245,8 +245,10 @@ never exposed as valid cache state.
   RPM-query failure tests.
 - [-] Add `plan remove PACKAGE [--arch ARCH]`: connect read-only RPM inventory
   to libsolv, select multilib identity explicitly, and reject removal that breaks
-  installed dependents. This remains plan-only; install/upgrade planning and
-  production solver policy are not complete.
+  installed dependents. The wrapper validates inventory and solver response
+  schemas; RPM query/solver failures fail closed. Container tests compare RPM
+  inventory before/after planning. This remains plan-only; install/upgrade
+  planning and production solver policy are not complete.
 
 - [ ] Define EVR, architecture, provides/requires, conflicts/obsoletes, and
   repository priority semantics.

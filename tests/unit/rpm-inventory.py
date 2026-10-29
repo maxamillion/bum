@@ -19,9 +19,9 @@ class Result:
 original_run = helper.subprocess.run
 try:
     helper.subprocess.run = lambda *_args, **_kwargs: Result(
-        "zlib\t(none)\t1.2\t3.el9\tx86_64\n"
-        "bash\t0\t5.1\t2.el9\tx86_64\n"
-        "bash\t0\t5.1\t2.el9\ti686\n"
+        "zlib\x1f(none)\x1f1.2\x1f3.el9\x1fx86_64\n"
+        "bash\x1f0\x1f5.1\x1f2.el9\x1fx86_64\n"
+        "bash\x1f0\x1f5.1\x1f2.el9\x1fi686\n"
     )
     packages = helper.inventory()
     assert [item["name"] for item in packages] == ["bash", "bash", "zlib"]
@@ -30,8 +30,8 @@ try:
     assert packages[2]["evr"] == "1.2-3.el9"
 
     helper.subprocess.run = lambda *_args, **_kwargs: Result(
-        "bash\t0\t5.1\t2.el9\tx86_64\n"
-        "bash\t0\t5.2\t1.el9\tx86_64\n"
+        "bash\x1f0\x1f5.1\x1f2.el9\x1fx86_64\n"
+        "bash\x1f0\x1f5.2\x1f1.el9\x1fx86_64\n"
     )
     try:
         helper.inventory()

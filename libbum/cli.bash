@@ -190,6 +190,10 @@ function fn_plan_remove {
         fi
         arch=$2
     fi
+    if [[ -z $arch || $arch =~ [^a-zA-Z0-9_+-] ]]; then
+        printf '%s: invalid architecture: %s\n' "$program" "$arch" >&2
+        return 2
+    fi
     python=${BUM_PYTHON:-python3}
     if ! command -v "$python" >/dev/null 2>&1; then
         printf '%s: Python interpreter not found: %s\n' "$program" "$python" >&2

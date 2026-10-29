@@ -35,6 +35,11 @@ def main():
                 or inventory.get("protocol") != 1
                 or not isinstance(inventory.get("packages"), list)):
             raise ValueError("RPM inventory returned an invalid response")
+        for item in inventory["packages"]:
+            if (not isinstance(item, dict)
+                    or not all(isinstance(item.get(key), str) and item[key]
+                               for key in ("name", "evr", "arch"))):
+                raise ValueError("RPM inventory contains an invalid package")
         solver_request = {
             "protocol": 1,
             "operation": "remove",
@@ -50,7 +55,15 @@ def main():
         )
         if solved.returncode not in (0, 1):
             raise RuntimeError("solver failed: " + solved.stderr.strip())
-        sys.stdout.write(solved.stdout)
+        response = json.loads(solved.stdout)
+        if (not isinstance(response, dict)
+                or response.get("protocol") != 1
+                or response.get("operation") != "remove"
+                or not isinstance(response.get("plan"), list)
+                or (solved.returncode == 1 and not response.get("error"))
+                or (solved.returncode == 0 and response.get("error"))):
+            raise ValueError("solver returned an invalid response")
+        sys.stdout.write(json.dumps(response, sort_keys=True) + "\n")
         return solved.returncode
     except (KeyError, TypeError, ValueError, RuntimeError, OSError,
             json.JSONDecodeError) as exc:

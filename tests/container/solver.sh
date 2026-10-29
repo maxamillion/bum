@@ -46,7 +46,6 @@ printf 'Running metadata/solver tests in %s\n' "$image"
         rpm_inventory_before=$(rpm -qa | sort)
         python3 tests/unit/solver-plan.py
         python3 tests/unit/plan-remove.py
-        python3 tests/unit/plan-remove.py
         rpm_inventory_after=$(rpm -qa | sort)
         test "$rpm_inventory_before" = "$rpm_inventory_after"
         python3 tests/unit/rpm-inventory.py

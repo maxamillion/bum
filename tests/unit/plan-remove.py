@@ -32,7 +32,7 @@ try:
         request = json.loads(kwargs["input"])
         assert request["installed"][0]["name"] == "demo"
         assert request["operation"] == "remove"
-        return subprocess.CompletedProcess(args, 0, '{"protocol":1,"plan":[]}\n', "")
+        return subprocess.CompletedProcess(args, 0, '{"protocol":1,"operation":"remove","plan":[]}\n', "")
 
     helper.subprocess.run = fake_run
     with contextlib.redirect_stdout(io.StringIO()) as output:
