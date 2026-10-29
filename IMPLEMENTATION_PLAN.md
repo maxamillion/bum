@@ -217,8 +217,10 @@ configuration resolution and package execution are incomplete.
 - [x] Implement deterministic local `*.repo` discovery and validate the first
   supported options (`name`, `baseurl`, `enabled`, `gpgcheck`, `gpgkey`), with
   boolean defaults and rejection of unknown options.
-- [ ] Specify parser handling for duplicate keys, comments, quoting, malformed
-  values, multiple repo files, and all supported fields.
+- [-] Specify parser handling for duplicate keys, comments, quoting, malformed
+  values, multiple repo files, and all supported fields. Added a regression for
+  retaining a valid final key/value line without a trailing newline; inline
+  comment and quoting semantics remain open.
 - [ ] Complete robust `.repo` parsing and fixtures from target distributions.
 - [x] Prototype selected RPM-MD primary retrieval/parsing using librepo with
   checksum verification and reusable cache; a loopback HTTP fixture test checks

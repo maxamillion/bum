@@ -83,6 +83,12 @@ if fn_parse_repofile; then
 fi
 test "${__return__[error]}" = 'repository file path is required'
 
+# The parser must retain a final key/value record without a terminating newline.
+printf '[final-no-newline]\nbaseurl=https://example.invalid/repo' > "$repo_file"
+fn_parse_repofile "$repo_file" || fail "final line without newline rejected"
+[[ ${__return__[final-no-newline|baseurl]} == \
+    'https://example.invalid/repo' ]] || fail 'final line value not retained'
+
 printf '[PASS] repository parser tests\n'
 
 # Repository directory loader applies defaults and validates required fields.
