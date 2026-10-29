@@ -26,7 +26,11 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-tar --exclude=.git -C "$repo_root" -cf - . | tar -C "$test_root" -xf -
+if ! tar --exclude=.git -C "$repo_root" -cf - . | \
+    tar -C "$test_root" -xf -; then
+    printf 'error: failed to stage repository for container tests\n' >&2
+    exit 1
+fi
 
 printf 'Running checks in %s\n' "$image"
 # shellcheck disable=SC2016
