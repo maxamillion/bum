@@ -6,8 +6,11 @@ import multiprocessing
 import pathlib
 import tempfile
 import time
+import sys
 
-helper_path = pathlib.Path(__file__).resolve().parents[2] / "helpers" / "bum-repomd.py"
+helper_dir = pathlib.Path(__file__).resolve().parents[2] / "helpers"
+sys.path.insert(0, str(helper_dir))
+helper_path = helper_dir / "bum-repomd.py"
 spec = importlib.util.spec_from_file_location("bum_repomd_lock", helper_path)
 helper = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helper)

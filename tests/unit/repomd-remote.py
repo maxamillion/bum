@@ -15,6 +15,7 @@ import tempfile
 import threading
 
 repo_root = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(repo_root / "helpers"))
 fixture = repo_root / "tests" / "fixtures" / "rpmmd"
 handler = functools.partial(
     http.server.SimpleHTTPRequestHandler, directory=str(fixture)

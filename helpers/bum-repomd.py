@@ -8,12 +8,15 @@ import json
 import os
 import re
 import stat
+import subprocess
 import sys
 import tempfile
 import unicodedata
 import urllib.parse
 import xml.etree.ElementTree as ElementTree
 import zlib
+
+import bum_solver_common
 
 try:
     import librepo
@@ -41,11 +44,22 @@ def _dependency(pool, entry):
     flags = entry.get("flags")
     version = entry.get("ver")
     release = entry.get("rel")
-    if flags and version:
-        evr = f"{version}-{release}" if release else version
-        name = f"{name} {flags} {evr}"
-    return pool.Dep(name)
-
+    if not flags or not version:
+        return pool.Dep(name)
+    relation = {
+        "LT": bum_solver_common.RPM_LESS,
+        "GT": bum_solver_common.RPM_GREATER,
+        "EQ": bum_solver_common.RPM_EQUAL,
+        "LE": bum_solver_common.RPM_LESS | bum_solver_common.RPM_EQUAL,
+        "GE": bum_solver_common.RPM_GREATER | bum_solver_common.RPM_EQUAL,
+    }.get(flags)
+    if relation is None:
+        raise ValueError(f"unsupported RPM-MD dependency relation: {flags}")
+    evr = f"{version}-{release}" if release else version
+    dependency_id = bum_solver_common.rpm_relation(
+        pool, name, relation, evr
+    )
+    return pool.Dep(pool.dep2str(dependency_id))
 
 def _parse_primary(pool, repo, primary_path):
     with gzip.open(primary_path, "rb") as metadata_file:
@@ -357,7 +371,31 @@ def _download_packages(source, cache_dir, packages):
         os.close(lock_fd)
 
 
-def _plan(source, package_name, cache_dir, download_dir=None):
+def _installed_inventory():
+    inventory_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "bum-rpm-inventory.py"
+    )
+    process = subprocess.run(
+        [sys.executable, inventory_path], capture_output=True,
+        text=True, check=False,
+    )
+    try:
+        result = json.loads(process.stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError("RPM inventory returned invalid JSON") from exc
+    if (not isinstance(result, dict)
+            or result.get("protocol") != PROTOCOL_VERSION):
+        raise ValueError("RPM inventory returned an invalid protocol")
+    if process.returncode:
+        raise RuntimeError(result.get("error", "RPM inventory failed"))
+    packages = result.get("packages")
+    if not isinstance(packages, list):
+        raise ValueError("RPM inventory omitted package list")
+    return packages
+
+
+def _plan(source, package_name, cache_dir, download_dir=None,
+          installed=None):
     if (not package_name or package_name.startswith("-")
             or any(ch.isspace() or unicodedata.category(ch) == "Cc"
                    for ch in package_name)):
@@ -368,10 +406,46 @@ def _plan(source, package_name, cache_dir, download_dir=None):
     ]
     if not matches:
         raise ValueError(f"package not found: {package_name}")
+    system_repo = pool.add_repo("@System")
+    identities = set()
+    for definition in installed or []:
+        if (not isinstance(definition, dict)
+                or not all(isinstance(definition.get(key), str)
+                           and definition[key]
+                           for key in ("name", "evr", "arch"))):
+            raise ValueError("invalid installed package record")
+        identity = definition["name"], definition["arch"]
+        if identity in identities:
+            raise ValueError("duplicate installed package identity")
+        identities.add(identity)
+        package = system_repo.add_solvable()
+        package.name = definition["name"]
+        package.evr = definition["evr"]
+        package.arch = definition["arch"]
+        package.add_provides(package.nameid)
+        for field, tag, key in (
+            ("provides", solv.SOLVABLE_PROVIDES, "provides"),
+            ("requires", solv.SOLVABLE_REQUIRES, "requires"),
+        ):
+            dependencies = definition.get(field, [])
+            if not isinstance(dependencies, list):
+                raise ValueError(f"installed package {identity[0]} has invalid {field}")
+            for dependency in dependencies:
+                if not isinstance(dependency, dict):
+                    raise ValueError(f"installed package {identity[0]} has invalid {field}")
+                dep_id = bum_solver_common.rpm_dependency(
+                    pool, dependency.get("name"), dependency.get("flags"),
+                    dependency.get("evr"),
+                )
+                package.add_deparray(tag, dep_id)
+    pool.installed = system_repo
+    system_repo.internalize()
+    repo.internalize()
+    pool.createwhatprovides()
     solver = pool.Solver()
     job = pool.Job(
-        solv.Job.SOLVER_INSTALL | solv.Job.SOLVER_SOLVABLE,
-        matches[0].id,
+        solv.Job.SOLVER_INSTALL | solv.Job.SOLVER_SOLVABLE_NAME,
+        pool.str2id(package_name, 1),
     )
     problems = solver.solve([job])
     if problems:
@@ -410,7 +484,10 @@ def main():
     )
     args = parser.parse_args()
     try:
-        result = _plan(args.repo, args.package, args.cache_dir, args.download)
+        installed = _installed_inventory()
+        result = _plan(
+            args.repo, args.package, args.cache_dir, args.download, installed
+        )
         print(json.dumps(result, sort_keys=True))
         return 0 if "error" not in result else 1
     except (

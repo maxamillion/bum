@@ -4,6 +4,7 @@ import json
 import sys
 
 import solv
+import bum_solver_common
 
 PROTOCOL_VERSION = 1
 
@@ -24,33 +25,10 @@ def _strings(value, field, package_name):
 def _rpm_dependency(pool, definition, package_name):
     if not isinstance(definition, dict):
         raise ValueError(f"dependency for {package_name} must be an object")
-    name = definition.get("name")
-    flags = definition.get("flags", 0)
-    evr = definition.get("evr")
-    if not isinstance(name, str) or not name:
-        raise ValueError(f"dependency for {package_name} has invalid name")
-    if not isinstance(flags, int) or isinstance(flags, bool) or flags < 0:
-        raise ValueError(f"dependency {name} has invalid flags")
-    if evr is not None and (not isinstance(evr, str) or not evr):
-        raise ValueError(f"dependency {name} has invalid EVR")
-    relation_mask = 2 | 4 | 8
-    relation = flags & relation_mask
-    if relation and not evr:
-        raise ValueError(f"versioned dependency {name} has no EVR")
-    if not relation:
-        return pool.Dep(name)
-    relation_flags = {
-        2: solv.REL_LT,
-        4: solv.REL_GT,
-        8: solv.REL_EQ,
-        2 | 8: solv.REL_LT | solv.REL_EQ,
-        4 | 8: solv.REL_GT | solv.REL_EQ,
-    }.get(relation)
-    if relation_flags is None:
-        raise ValueError(f"unsupported RPM dependency relation for {name}")
-    name_id = pool.str2id(name, 1)
-    evr_id = pool.str2id(evr, 1)
-    return pool.rel2id(name_id, evr_id, relation_flags)
+    return bum_solver_common.rpm_dependency(
+        pool, definition.get("name"), definition.get("flags", 0),
+        definition.get("evr"),
+    )
 
 
 def _package(repo, pool, definition, architecture, field):
