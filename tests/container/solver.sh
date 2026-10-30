@@ -47,6 +47,7 @@ printf 'Running metadata/solver tests in %s\n' "$image"
             printf "No package installer for RPM-MD test dependencies\\n" >&2
             exit 77
         fi
+        python3 tests/unit/rpm-inventory-real.py
         rpm_inventory_before=$(rpm -qa | sort)
         python3 tests/unit/solver-plan.py
         python3 tests/unit/plan-remove.py

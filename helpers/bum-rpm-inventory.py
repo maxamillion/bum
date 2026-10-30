@@ -9,7 +9,7 @@ PROTOCOL_VERSION = 1
 
 def inventory(rpm="rpm"):
     result = subprocess.run(
-        [rpm, "-qa", "--qf", "%{NAME}\\x1f%{EPOCHNUM}\\x1f%{VERSION}\\x1f%{RELEASE}\\x1f%{ARCH}\\n"],
+        [rpm, "-qa", "--qf", "%{NAME}\\t%{EPOCHNUM}\\t%{VERSION}\\t%{RELEASE}\\t%{ARCH}\\n"],
         check=False,
         capture_output=True,
         text=True,
@@ -22,7 +22,7 @@ def inventory(rpm="rpm"):
     packages = []
     seen = set()
     for line_number, line in enumerate(result.stdout.splitlines(), 1):
-        fields = line.split("\x1f")
+        fields = line.split("\t")
         if len(fields) != 5 or any(not field for field in fields):
             raise ValueError(f"malformed rpm query record at line {line_number}")
         name, epoch, version, release, arch = fields

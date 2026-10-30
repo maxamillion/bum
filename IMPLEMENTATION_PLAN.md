@@ -244,7 +244,9 @@ never exposed as valid cache state.
   coverage.
 - [x] Add a read-only RPM CLI inventory adapter with normalized epoch-version-
   release/architecture records, deterministic ordering, and malformed/duplicate/
-  RPM-query failure tests.
+  RPM-query failure tests. Tests assert the exact query format; live container
+  integration exercises it on AlmaLinux 9. Other RPM query-format versions
+  remain matrix work.
 - [-] Add `plan remove PACKAGE [--arch ARCH]`: connect read-only RPM inventory
   to libsolv, select multilib identity explicitly, and reject removal that breaks
   installed dependents. The wrapper validates inventory and solver response

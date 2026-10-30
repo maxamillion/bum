@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test installed RPM inventory parsing with a mocked rpm executable."""
+"""Test installed RPM inventory parsing with mocked rpm query output."""
 import importlib.util
 import pathlib
 
@@ -17,21 +17,34 @@ class Result:
 
 
 original_run = helper.subprocess.run
-try:
-    helper.subprocess.run = lambda *_args, **_kwargs: Result(
-        "zlib\x1f(none)\x1f1.2\x1f3.el9\x1fx86_64\n"
-        "bash\x1f0\x1f5.1\x1f2.el9\x1fx86_64\n"
-        "bash\x1f0\x1f5.1\x1f2.el9\x1fi686\n"
+calls = []
+
+
+def query_mock(args, **kwargs):
+    calls.append((args, kwargs))
+    return Result(
+        "zlib\t(none)\t1.2\t3.el9\tx86_64\n"
+        "bash\t0\t5.1\t2.el9\tx86_64\n"
+        "bash\t0\t5.1\t2.el9\ti686\n"
     )
+
+
+try:
+    helper.subprocess.run = query_mock
     packages = helper.inventory()
     assert [item["name"] for item in packages] == ["bash", "bash", "zlib"]
     assert packages[0]["arch"] == "i686"
     assert packages[1]["arch"] == "x86_64"
     assert packages[2]["evr"] == "1.2-3.el9"
+    assert calls[0][0] == [
+        "rpm", "-qa", "--qf",
+        "%{NAME}\\t%{EPOCHNUM}\\t%{VERSION}\\t%{RELEASE}\\t%{ARCH}\\n",
+    ], calls
+    assert calls[0][1]["check"] is False
 
     helper.subprocess.run = lambda *_args, **_kwargs: Result(
-        "bash\x1f0\x1f5.1\x1f2.el9\x1fx86_64\n"
-        "bash\x1f0\x1f5.2\x1f1.el9\x1fx86_64\n"
+        "bash\t0\t5.1\t2.el9\tx86_64\n"
+        "bash\t0\t5.2\t1.el9\tx86_64\n"
     )
     try:
         helper.inventory()
