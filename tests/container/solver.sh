@@ -40,9 +40,9 @@ printf 'Running metadata/solver tests in %s\n' "$image"
     "$image" -c '
         set -euo pipefail
         if command -v dnf >/dev/null 2>&1; then
-            dnf -y -q install python3-solv python3-librepo
+            dnf -y -q install python3-solv python3-librepo python3-rpm
         elif command -v microdnf >/dev/null 2>&1; then
-            microdnf -y install python3-solv python3-librepo
+            microdnf -y install python3-solv python3-librepo python3-rpm
         else
             printf "No package installer for RPM-MD test dependencies\\n" >&2
             exit 77

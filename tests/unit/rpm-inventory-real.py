@@ -13,6 +13,9 @@ assert result.returncode == 0, result.stderr or result.stdout
 response = json.loads(result.stdout)
 assert response["protocol"] == 1
 assert response["packages"]
-assert all(set(item) == {"name", "evr", "arch"}
+assert all(set(item) == {"name", "evr", "arch", "provides", "requires"}
            for item in response["packages"])
+assert all(isinstance(dep["flags"], int)
+           for package in response["packages"]
+           for dep in package["provides"] + package["requires"])
 print("[PASS] live RPM inventory query")

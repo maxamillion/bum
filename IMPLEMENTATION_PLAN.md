@@ -241,12 +241,12 @@ never exposed as valid cache state.
   generate install, upgrade, and remove plans; test no-downgrade upgrade behavior
   and reject removal that would break an installed dependent. This remains a
   fixture planner, not production RPM database integration or complete policy
-  coverage.
-- [x] Add a read-only RPM CLI inventory adapter with normalized epoch-version-
-  release/architecture records, deterministic ordering, and malformed/duplicate/
-  RPM-query failure tests. Tests assert the exact query format; live container
-  integration exercises it on AlmaLinux 9. Other RPM query-format versions
-  remain matrix work.
+  coverage. The fixture solver now translates structured RPM relation flag bits
+  into libsolv provides/requires and tests a versioned installed virtual provide.
+- [x] Add a read-only RPM binding inventory adapter with normalized package
+  identity plus structured provides/requires name, relation flags, and EVR arrays;
+  test malformed parallel arrays and run a live query in AlmaLinux 9. Python RPM
+  binding availability on other matrix targets remains unverified.
 - [-] Add `plan remove PACKAGE [--arch ARCH]`: connect read-only RPM inventory
   to libsolv, select multilib identity explicitly, and reject removal that breaks
   installed dependents. The wrapper validates inventory and solver response

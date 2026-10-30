@@ -21,6 +21,38 @@ def _strings(value, field, package_name):
     return value
 
 
+def _rpm_dependency(pool, definition, package_name):
+    if not isinstance(definition, dict):
+        raise ValueError(f"dependency for {package_name} must be an object")
+    name = definition.get("name")
+    flags = definition.get("flags", 0)
+    evr = definition.get("evr")
+    if not isinstance(name, str) or not name:
+        raise ValueError(f"dependency for {package_name} has invalid name")
+    if not isinstance(flags, int) or isinstance(flags, bool) or flags < 0:
+        raise ValueError(f"dependency {name} has invalid flags")
+    if evr is not None and (not isinstance(evr, str) or not evr):
+        raise ValueError(f"dependency {name} has invalid EVR")
+    relation_mask = 2 | 4 | 8
+    relation = flags & relation_mask
+    if relation and not evr:
+        raise ValueError(f"versioned dependency {name} has no EVR")
+    if not relation:
+        return pool.Dep(name)
+    relation_flags = {
+        2: solv.REL_LT,
+        4: solv.REL_GT,
+        8: solv.REL_EQ,
+        2 | 8: solv.REL_LT | solv.REL_EQ,
+        4 | 8: solv.REL_GT | solv.REL_EQ,
+    }.get(relation)
+    if relation_flags is None:
+        raise ValueError(f"unsupported RPM dependency relation for {name}")
+    name_id = pool.str2id(name, 1)
+    evr_id = pool.str2id(evr, 1)
+    return pool.rel2id(name_id, evr_id, relation_flags)
+
+
 def _package(repo, pool, definition, architecture, field):
     if not isinstance(definition, dict):
         raise ValueError(f"each {field} package must be a JSON object")
@@ -36,12 +68,22 @@ def _package(repo, pool, definition, architecture, field):
     solvable = repo.add_solvable()
     solvable.name, solvable.evr, solvable.arch = name, evr, package_arch
     solvable.add_provides(solvable.nameid)
-    capabilities = _strings(definition.get("provides", []), "provides", name)
+    capabilities = definition.get("provides", [])
+    requirements = definition.get("requires", [])
+    if not isinstance(capabilities, list) or not isinstance(requirements, list):
+        raise ValueError(f"provides/requires for {name} must be arrays")
     for capability in capabilities:
-        solvable.add_provides(pool.Dep(capability))
-    requirements = _strings(definition.get("requires", []), "requires", name)
+        if isinstance(capability, str):
+            solvable.add_provides(pool.Dep(capability))
+        else:
+            dependency = _rpm_dependency(pool, capability, name)
+            solvable.add_deparray(solv.SOLVABLE_PROVIDES, dependency)
     for requirement in requirements:
-        solvable.add_requires(pool.Dep(requirement))
+        if isinstance(requirement, str):
+            solvable.add_requires(pool.Dep(requirement))
+        else:
+            dependency = _rpm_dependency(pool, requirement, name)
+            solvable.add_deparray(solv.SOLVABLE_REQUIRES, dependency)
     conflicts = _strings(definition.get("conflicts", []), "conflicts", name)
     for conflict in conflicts:
         solvable.add_conflicts(pool.Dep(conflict))
@@ -50,6 +92,8 @@ def _package(repo, pool, definition, architecture, field):
 
 def _solve(request):
     pool = solv.Pool()
+    if hasattr(solv, "DISTTYPE_RPM"):
+        pool.setdisttype(solv.DISTTYPE_RPM)
     architecture = request.get("arch", "x86_64")
     if not isinstance(architecture, str) or not architecture:
         raise ValueError("arch must be a non-empty string")

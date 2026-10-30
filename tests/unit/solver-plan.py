@@ -165,6 +165,30 @@ multilib_plan = json.loads(multilib_result.stdout)["plan"]
 assert multilib_plan == [{"action": "remove", "name": "demo",
                           "evr": "1.0-1", "arch": "i686"}], multilib_plan
 
+# Versioned RPM inventory dependencies preserve the comparison relation.
+relation_request = {
+    "operation": "install",
+    "package": "app",
+    "arch": "x86_64",
+    "packages": [
+        {"name": "app", "evr": "1-1", "requires": [
+            {"name": "virtual-api", "flags": 12, "evr": "2"},
+        ]},
+        {"name": "provider-old", "evr": "1-1", "provides": [
+            {"name": "virtual-api", "flags": 0, "evr": None},
+        ]},
+    ],
+    "installed": [{
+        "name": "provider", "evr": "1-1", "arch": "x86_64",
+        "provides": [{"name": "virtual-api", "flags": 8, "evr": "2.5"}],
+    }],
+}
+relation_result = run_request(relation_request)
+assert relation_result.returncode == 0, relation_result.stdout
+assert {item["name"] for item in json.loads(relation_result.stdout)["plan"]} == {
+    "app"
+}, relation_result.stdout
+
 # An upgrade with no newer candidate must not report a misleading no-op.
 old_only = {
     "operation": "upgrade",
